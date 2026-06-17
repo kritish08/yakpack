@@ -7,8 +7,12 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const nextParam = requestUrl.searchParams.get('next') ?? '/'
-  // Prevent open redirect — only allow same-origin relative paths
-  const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/'
+  // Prevent open redirect via URL parsing — reject anything that resolves to a different origin
+  // (catches /\example.com backslash bypass and protocol-relative URLs)
+  const target = new URL(nextParam, request.url)
+  const next = target.origin === requestUrl.origin
+    ? target.pathname + target.search + target.hash
+    : '/'
 
   if (code) {
     const cookieStore = await cookies()
