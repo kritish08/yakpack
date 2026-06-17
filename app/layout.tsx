@@ -3,8 +3,9 @@ import { ThemeProvider } from 'next-themes'
 import { Syne, DM_Sans, DM_Mono } from 'next/font/google'
 import SwRegister from '@/components/sw-register'
 import { SpeedInsights } from '@vercel/speed-insights/next'
-import '@/styles/tokens.css'
+import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import '@/styles/tokens.css'
 
 const syne = Syne({
   subsets: ['latin'],
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </ThemeProvider>
         <SwRegister />
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   )

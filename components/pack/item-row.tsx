@@ -82,7 +82,7 @@ export default function ItemRow({ item, packed, profile, onToggle }: ItemRowProp
         >
           {isPacked && (
             <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
-              <path d="M1 4L4.5 7.5L11 1" stroke="#0f0e0c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M1 4L4.5 7.5L11 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           )}
         </span>
