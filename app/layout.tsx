@@ -26,6 +26,10 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: 'YakPack',
   description: 'Two-person Spiti trip companion. Haul it like a yak.',
+  icons: {
+    icon: '/icons/icon.svg',
+    apple: '/icons/icon.svg',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

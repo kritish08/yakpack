@@ -13,14 +13,9 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ['travel', 'utilities'],
     icons: [
       {
-        src: '/icon',
-        sizes: '192x192',
-        type: 'image/png',
-      },
-      {
-        src: '/icon',
-        sizes: '512x512',
-        type: 'image/png',
+        src: '/icons/icon.svg',
+        sizes: 'any',
+        type: 'image/svg+xml',
         purpose: 'maskable',
       },
     ],
