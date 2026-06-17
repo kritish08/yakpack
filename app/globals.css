@@ -48,6 +48,27 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* YakPack design token → Tailwind utility mappings */
+@theme {
+  --color-bg:           var(--bg);
+  --color-surface:      var(--surface);
+  --color-surface-2:    var(--surface-2);
+  --color-border:       var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text:         var(--text);
+  --color-text-muted:   var(--text-muted);
+  --color-text-dim:     var(--text-dim);
+  --color-accent:       var(--accent);
+  --color-accent-2:     var(--accent-2);
+  --color-accent-3:     var(--accent-3);
+  --color-accent-4:     var(--accent-4);
+  --color-accent-dim:   var(--accent-dim);
+
+  --font-display: var(--font-syne), sans-serif;
+  --font-body:    var(--font-dm-sans), sans-serif;
+  --font-mono:    var(--font-dm-mono), monospace;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
