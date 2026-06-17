@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { ThemeProvider } from 'next-themes'
 import { Syne, DM_Sans, DM_Mono } from 'next/font/google'
 import SwRegister from '@/components/sw-register'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import '@/styles/tokens.css'
 import './globals.css'
 
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </ThemeProvider>
         <SwRegister />
+        <SpeedInsights />
       </body>
     </html>
   )
