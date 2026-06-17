@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Sun, Package, ShoppingCart, Map, MessageCircle } from 'lucide-react'
+import { Sun, Package, ShoppingCart, Map, MessageCircle, Settings } from 'lucide-react'
 import ThemeToggle from '@/components/theme-toggle'
 import PageTransition from '@/components/page-transition'
 
@@ -25,6 +25,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </span>
         <div className="flex items-center gap-2">
           <span className="text-2xl" aria-label="Pemba the yak">🐂</span>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="p-2 rounded-lg text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
+          >
+            <Settings size={18} aria-hidden="true" />
+          </Link>
           <ThemeToggle />
         </div>
       </header>

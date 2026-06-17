@@ -1,15 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
-import type { CategoryWithItems, Packed, Profile } from '@/lib/pack'
+import { useState, useTransition } from 'react'
+import { ChevronDown, Plus, X, Check } from 'lucide-react'
+import type { CategoryWithItems, Item, Packed, Profile } from '@/lib/pack'
 import ItemRow from './item-row'
+import { addItem } from '@/app/actions/items'
 
 interface CategoryCardProps {
   category: CategoryWithItems
   packed: Packed[]
   profile: Profile
   onToggle: (itemId: string, userKey: string, isPacked: boolean) => void
+  onEdit?: (item: Item) => void
+  onDelete?: (itemId: string) => void
 }
 
 function countPacked(items: CategoryWithItems['items'], packed: Packed[], profileRole: string) {
@@ -22,15 +25,45 @@ function countPacked(items: CategoryWithItems['items'], packed: Packed[], profil
   return { total, done }
 }
 
-export default function CategoryCard({ category, packed, profile, onToggle }: CategoryCardProps) {
+const inputClass =
+  'bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent transition-colors'
+
+export default function CategoryCard({ category, packed, profile, onToggle, onEdit, onDelete }: CategoryCardProps) {
   const [open, setOpen] = useState(true)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newQty, setNewQty] = useState('')
+  const [newAssignedTo, setNewAssignedTo] = useState<'kritish' | 'partner' | 'shared'>('shared')
+  const [newStatus, setNewStatus] = useState<'owned' | 'to_buy' | 'standard'>('standard')
+  const [isPending, startTransition] = useTransition()
+
   const { total, done } = countPacked(category.items, packed, profile.role)
   const allDone = total > 0 && done === total
   const progress = total > 0 ? (done / total) * 100 : 0
 
+  function resetForm() {
+    setNewName(''); setNewQty(''); setNewAssignedTo('shared'); setNewStatus('standard'); setShowAddForm(false)
+  }
+
+  function handleAddSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newName.trim()) return
+    const scope: 'each' | 'shared' = newAssignedTo === 'shared' ? 'shared' : 'each'
+    startTransition(async () => {
+      await addItem({
+        category_id: category.id as number,
+        name: newName.trim(),
+        qty: newQty.trim() || undefined,
+        status: newStatus,
+        assigned_to: newAssignedTo,
+        scope,
+      })
+      resetForm()
+    })
+  }
+
   return (
     <div className="border border-border rounded-2xl overflow-hidden bg-surface">
-      {/* Header */}
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2/50 transition-colors"
@@ -42,37 +75,67 @@ export default function CategoryCard({ category, packed, profile, onToggle }: Ca
         <span className={`font-mono text-xs tabular-nums ${allDone ? 'text-accent-2' : 'text-text-muted'}`}>
           {done}/{total}
         </span>
-        <ChevronDown
-          size={16}
-          className={`text-text-muted transition-transform duration-200 ${open ? 'rotate-0' : '-rotate-90'}`}
-        />
+        <ChevronDown size={16} className={`text-text-muted transition-transform duration-200 ${open ? 'rotate-0' : '-rotate-90'}`} />
       </button>
 
-      {/* Progress bar */}
       <div className="h-0.5 bg-border mx-4">
-        <div
-          className="h-full bg-accent-2 transition-all duration-300 rounded-full"
-          style={{ width: `${progress}%` }}
-        />
+        <div className="h-full bg-accent-2 transition-all duration-300 rounded-full" style={{ width: `${progress}%` }} />
       </div>
 
-      {/* Items */}
-      {open && category.items.length > 0 && (
-        <div className="divide-y divide-border/50">
-          {category.items.map(item => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              packed={packed}
-              profile={profile}
-              onToggle={onToggle}
-            />
-          ))}
-        </div>
-      )}
+      {open && (
+        <>
+          {category.items.length > 0 ? (
+            <div className="divide-y divide-border/50">
+              {category.items.map(item => (
+                <ItemRow key={item.id} item={item} packed={packed} profile={profile} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />
+              ))}
+            </div>
+          ) : (
+            <p className="px-4 py-3 font-mono text-xs text-text-dim">No items</p>
+          )}
 
-      {open && category.items.length === 0 && (
-        <p className="px-4 py-3 font-mono text-xs text-text-dim">No items</p>
+          {showAddForm ? (
+            <form onSubmit={handleAddSubmit} className="border-t border-border/50 px-4 py-3 flex flex-col gap-2">
+              <input
+                type="text"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder="Item name"
+                autoFocus
+                required
+                className={`${inputClass} w-full`}
+              />
+              <div className="flex gap-2">
+                <input type="text" value={newQty} onChange={e => setNewQty(e.target.value)} placeholder="Qty" className={`${inputClass} w-20 shrink-0`} />
+                <select value={newAssignedTo} onChange={e => setNewAssignedTo(e.target.value as 'kritish' | 'partner' | 'shared')} className={`${inputClass} flex-1`}>
+                  <option value="kritish">Kritish</option>
+                  <option value="partner">Partner</option>
+                  <option value="shared">Shared</option>
+                </select>
+                <select value={newStatus} onChange={e => setNewStatus(e.target.value as 'owned' | 'to_buy' | 'standard')} className={`${inputClass} flex-1`}>
+                  <option value="owned">Owned</option>
+                  <option value="to_buy">To Buy</option>
+                  <option value="standard">Standard</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={isPending || !newName.trim()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-bg font-body text-xs font-medium disabled:opacity-50 min-h-[36px]">
+                  <Check size={12} />{isPending ? 'Saving…' : 'Save'}
+                </button>
+                <button type="button" onClick={resetForm} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-2 border border-border text-text-muted font-body text-xs min-h-[36px]">
+                  <X size={12} />Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="w-full py-2 text-xs text-text-dim hover:text-accent transition-colors flex items-center justify-center gap-1 border-t border-border/30 min-h-[40px]"
+            >
+              <Plus size={12} /> Add item
+            </button>
+          )}
+        </>
       )}
     </div>
   )
