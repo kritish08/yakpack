@@ -10,9 +10,13 @@
  *   pnpm seed --dry-run      # print counts without touching DB
  */
 
+import { config } from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
+
+// Load .env.local (Next.js convention) — works regardless of how the script is invoked
+config({ path: path.resolve(process.cwd(), '.env.local') })
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
