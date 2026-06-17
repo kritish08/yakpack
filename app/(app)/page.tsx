@@ -1,4 +1,3 @@
-import { headers } from 'next/headers'
 import { getTodayData, fetchWeather } from '@/lib/today'
 import { deriveCarryTags } from '@/lib/weather'
 import WeatherHero from '@/components/today/weather-hero'
@@ -9,13 +8,7 @@ import HeadsUp from '@/components/today/heads-up'
 export default async function TodayPage() {
   const { todayLeg, items, isToday, isFuture, isPast } = await getTodayData()
 
-  // Build absolute URL for the weather API (needed for server-side fetch)
-  const headersList = await headers()
-  const host = headersList.get('host') ?? 'localhost:3000'
-  const protocol = host.includes('localhost') ? 'http' : 'https'
-  const baseUrl = `${protocol}://${host}`
-
-  const wx = todayLeg ? await fetchWeather(todayLeg.lat, todayLeg.lon, baseUrl) : null
+  const wx = todayLeg ? await fetchWeather(todayLeg.lat, todayLeg.lon) : null
   const activeTags = wx && todayLeg ? deriveCarryTags(wx, todayLeg.altitude_m ?? 0) : []
 
   return (
