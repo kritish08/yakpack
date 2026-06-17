@@ -6,7 +6,9 @@ import type { NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next') ?? '/'
+  const nextParam = requestUrl.searchParams.get('next') ?? '/'
+  // Prevent open redirect — only allow same-origin relative paths
+  const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/'
 
   if (code) {
     const cookieStore = await cookies()
