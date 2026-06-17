@@ -1,0 +1,33 @@
+/* YakPack design tokens — dark-first, all colors via CSS variables */
+
+:root {
+  --bg:             #0f0e0c;
+  --surface:        #171614;
+  --surface-2:      #1f1d1a;
+  --border:         #2e2a25;
+  --border-strong:  #3d3830;
+  --text:           #f0ece4;
+  --text-muted:     #8a8078;
+  --text-dim:       #4a4540;
+  --accent:         #d4943a;
+  --accent-2:       #4a9e7e;
+  --accent-3:       #9e4a4a;
+  --accent-4:       #4a6e9e;
+  --accent-dim:     rgba(212, 148, 58, 0.10);
+}
+
+[data-theme='light'] {
+  --bg:             #f7f4ef;
+  --surface:        #ffffff;
+  --surface-2:      #f0ece4;
+  --border:         #e0d9ce;
+  --border-strong:  #cfc7b8;
+  --text:           #1a1714;
+  --text-muted:     #6b6158;
+  --text-dim:       #a89e92;
+  --accent:         #b07d4a;
+  --accent-2:       #4a7d6e;
+  --accent-3:       #7d4a4a;
+  --accent-4:       #4a6e9e;
+  --accent-dim:     rgba(176, 125, 74, 0.08);
+}
