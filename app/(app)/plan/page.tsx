@@ -1,10 +1,7 @@
-export default function PlanPage() {
-  return (
-    <div className="p-4">
-      <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text mb-2">
-        Plan
-      </h1>
-      <p className="text-text-muted font-mono text-sm">Coming in M6</p>
-    </div>
-  )
+import { getPlanData } from '@/lib/plan'
+import PlanScreen from '@/components/plan/plan-screen'
+
+export default async function PlanPage() {
+  const data = await getPlanData()
+  return <PlanScreen {...data} />
 }
