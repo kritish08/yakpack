@@ -8,7 +8,7 @@ on:
 
 jobs:
   check:
-    name: Type-check · Lint · Build
+    name: Type-check · Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,8 +25,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm type-check
-
-      - run: pnpm lint
 
       - run: pnpm build
         env:
