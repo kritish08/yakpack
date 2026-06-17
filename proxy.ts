@@ -30,7 +30,11 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public paths — let through
-  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
+  if (
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/api/auth')
+  ) {
     if (user && pathname === '/login') {
       return NextResponse.redirect(new URL('/', request.url))
     }

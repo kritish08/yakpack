@@ -4,26 +4,73 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+type Mode = 'signin' | 'forgot'
+
 export default function LoginPage() {
+  const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  function switchMode(next: Mode) {
+    setMode(next)
+    setError(null)
+    setResetSent(false)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
+
+    if (mode === 'forgot') {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/api/auth/callback?next=/reset-password`,
+      })
+      if (err) {
+        setError(err.message)
+      } else {
+        setResetSent(true)
+      }
+      setLoading(false)
+      return
+    }
+
+    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+    if (err) {
+      setError(err.message)
       setLoading(false)
     } else {
       router.push('/')
       router.refresh()
     }
+  }
+
+  if (resetSent) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+        <div className="bg-surface rounded-2xl p-8 w-full max-w-sm shadow-xl border border-border text-center">
+          <span className="text-5xl">📬</span>
+          <h1 className="font-display font-bold text-xl uppercase tracking-tight text-text mt-4">
+            Check your email
+          </h1>
+          <p className="text-text-muted font-mono text-sm mt-2 leading-relaxed">
+            A reset link was sent to{' '}
+            <span className="text-text">{email}</span>.
+          </p>
+          <button
+            onClick={() => switchMode('signin')}
+            className="mt-6 font-mono text-sm text-accent hover:underline"
+          >
+            ← Back to sign in
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -34,7 +81,9 @@ export default function LoginPage() {
           <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text mt-3">
             YakPack
           </h1>
-          <p className="text-text-muted font-mono text-sm mt-1">Haul it like a yak.</p>
+          <p className="text-text-muted font-mono text-sm mt-1">
+            {mode === 'forgot' ? 'Reset your password.' : 'Haul it like a yak.'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -53,20 +102,22 @@ export default function LoginPage() {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-mono text-text-muted uppercase tracking-wider">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              className="w-full bg-surface-2 border border-border rounded-lg px-4 py-3 text-text font-body text-sm placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors"
-              placeholder="••••••••"
-            />
-          </div>
+          {mode === 'signin' && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-mono text-text-muted uppercase tracking-wider">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full bg-surface-2 border border-border rounded-lg px-4 py-3 text-text font-body text-sm placeholder:text-text-dim focus:outline-none focus:border-accent transition-colors"
+                placeholder="••••••••"
+              />
+            </div>
+          )}
 
           {error && (
             <p className="text-accent-3 font-mono text-xs">{error}</p>
@@ -77,7 +128,17 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-accent text-bg font-display font-bold uppercase tracking-tight text-sm py-3 rounded-xl mt-2 disabled:opacity-50 transition-opacity"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading
+              ? mode === 'forgot' ? 'Sending…' : 'Signing in…'
+              : mode === 'forgot' ? 'Send reset link' : 'Sign in'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => switchMode(mode === 'signin' ? 'forgot' : 'signin')}
+            className="font-mono text-xs text-text-muted hover:text-accent transition-colors text-center"
+          >
+            {mode === 'signin' ? 'Forgot password?' : '← Back to sign in'}
           </button>
         </form>
       </div>

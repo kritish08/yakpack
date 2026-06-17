@@ -12,80 +12,132 @@ interface PlanScreenProps {
 }
 
 export default function PlanScreen({ legs, trip, profile, today }: PlanScreenProps) {
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const stripRef = useRef<HTMLDivElement>(null)
   const todayIndex = legs.findIndex(l => l.date === today)
-  const todayRef = useRef<HTMLDivElement>(null)
 
-  // Scroll today's card into view on mount
-  useEffect(() => {
-    if (todayRef.current) {
-      todayRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [])
-
-  const tripStarted = legs.length > 0 && today >= (legs[0].date ?? '')
+  const departDate = legs[0]?.date ?? ''
+  const tripStarted = departDate && today >= departDate
   const tripEnded = legs.length > 0 && today > (legs[legs.length - 1].date ?? '')
 
+  const daysToGo = departDate && !tripStarted
+    ? Math.ceil((new Date(departDate + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
+    : null
+
+  useEffect(() => {
+    const ref = cardRefs.current[todayIndex >= 0 ? todayIndex : 0]
+    ref?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+    // scroll the journey strip to center the active pill
+    const strip = stripRef.current
+    if (strip && todayIndex >= 0) {
+      const pill = strip.children[todayIndex] as HTMLElement | undefined
+      if (pill) {
+        strip.scrollTo({ left: pill.offsetLeft - strip.clientWidth / 2 + pill.offsetWidth / 2, behavior: 'smooth' })
+      }
+    }
+  }, [todayIndex])
+
+  function scrollToDay(index: number) {
+    cardRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
-    <div className="px-4 pt-4 pb-6">
+    <div className="h-full overflow-y-auto pb-20">
       {/* Header */}
-      <div className="mb-5">
-        <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text">Plan</h1>
-        {trip && (
-          <p className="font-mono text-xs text-text-muted mt-0.5">
-            {trip.name} · {legs.length} days
-          </p>
-        )}
-
-        {/* Trip status strip */}
-        {tripEnded ? (
-          <div className="mt-3 bg-surface border border-border rounded-xl px-3 py-2 font-mono text-xs text-text-muted">
-            Trip complete — what a ride, {profile.display_name}!
+      <div className="px-4 pt-5 pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text leading-none">
+              {trip?.name ?? 'Spiti Valley'}
+            </h1>
+            <p className="font-mono text-xs text-text-muted mt-1">
+              {legs.length} days · {profile.display_name}
+            </p>
           </div>
-        ) : !tripStarted ? (
-          <div className="mt-3 bg-accent/10 border border-accent/30 rounded-xl px-3 py-2 font-mono text-xs text-accent">
-            Departs {legs[0]?.date
-              ? new Date(legs[0].date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
-              : '—'}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Trip contacts */}
-      {trip && (
-        <div className="mb-5 bg-surface border border-border rounded-2xl p-4 flex flex-col gap-2">
-          <p className="font-mono text-[11px] text-text-muted uppercase tracking-wider mb-1">Emergency contacts</p>
-          {trip.coordinator_name && (
-            <a href={`tel:${trip.coordinator_phone}`} className="flex items-center justify-between group">
-              <span className="font-body text-sm text-text">{trip.coordinator_name}</span>
-              <span className="font-mono text-xs text-accent group-active:text-accent/70">{trip.coordinator_phone}</span>
-            </a>
-          )}
-          {trip.leader_name && (
-            <a href={`tel:${trip.leader_phone}`} className="flex items-center justify-between group border-t border-border/50 pt-2">
-              <span className="font-body text-sm text-text">{trip.leader_name}</span>
-              <span className="font-mono text-xs text-accent group-active:text-accent/70">{trip.leader_phone}</span>
-            </a>
+          {/* Status chip */}
+          {tripEnded ? (
+            <span className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-border/30 text-text-muted border border-border shrink-0">
+              Complete
+            </span>
+          ) : daysToGo !== null ? (
+            <span className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-accent/10 text-accent border border-accent/30 shrink-0">
+              {daysToGo}d to go
+            </span>
+          ) : (
+            <span className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-accent-2/10 text-accent-2 border border-accent-2/30 shrink-0">
+              Underway
+            </span>
           )}
         </div>
-      )}
 
-      {/* Timeline */}
-      <div>
-        {legs.map((leg, i) => {
-          const isToday = leg.date === today
-          const isPast = !!leg.date && today > leg.date
+        {/* Emergency contacts */}
+        {trip && (trip.coordinator_name || trip.leader_name) && (
+          <div className="mt-4 bg-surface border border-border rounded-xl px-4 py-3 flex flex-col gap-2">
+            <p className="font-mono text-[10px] text-text-muted uppercase tracking-wider">Emergency contacts</p>
+            {trip.coordinator_name && (
+              <a href={`tel:${trip.coordinator_phone}`} className="flex items-center justify-between group">
+                <span className="font-body text-sm text-text">{trip.coordinator_name}</span>
+                <span className="font-mono text-xs text-accent group-active:opacity-70">{trip.coordinator_phone}</span>
+              </a>
+            )}
+            {trip.leader_name && (
+              <a href={`tel:${trip.leader_phone}`} className="flex items-center justify-between group border-t border-border/40 pt-2">
+                <span className="font-body text-sm text-text">{trip.leader_name}</span>
+                <span className="font-mono text-xs text-accent group-active:opacity-70">{trip.leader_phone}</span>
+              </a>
+            )}
+          </div>
+        )}
+      </div>
 
-          return (
-            <div key={leg.day} ref={isToday ? todayRef : undefined}>
-              <DayCard
-                leg={leg}
-                isToday={isToday}
-                isPast={isPast}
-                isLast={i === legs.length - 1}
-              />
-            </div>
-          )
-        })}
+      {/* Journey strip — sticky */}
+      <div className="sticky top-0 z-10 bg-bg/90 backdrop-blur-sm border-b border-border/50 px-4 py-2.5">
+        <div
+          ref={stripRef}
+          className="flex gap-2 overflow-x-auto no-scrollbar"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {legs.map((leg, i) => {
+            const isToday = leg.date === today
+            const isPast = !!leg.date && today > leg.date
+            return (
+              <button
+                key={leg.day}
+                onClick={() => scrollToDay(i)}
+                aria-label={`Day ${leg.day}`}
+                className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center font-mono text-sm font-bold transition-all ${
+                  isToday
+                    ? 'bg-accent text-bg scale-110 shadow-sm'
+                    : isPast
+                    ? 'bg-border/30 text-text-muted'
+                    : 'bg-surface border border-border text-text-muted hover:border-accent/50 hover:text-text'
+                }`}
+              >
+                {leg.day}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Day cards */}
+      <div className="px-4 pt-4 flex flex-col gap-4">
+        {legs.map((leg, i) => (
+          <DayCard
+            key={leg.day}
+            leg={leg}
+            isToday={leg.date === today}
+            isPast={!!leg.date && today > leg.date}
+            cardRef={el => { cardRefs.current[i] = el }}
+          />
+        ))}
+
+        {legs.length === 0 && (
+          <div className="text-center py-16">
+            <p className="font-mono text-sm text-text-muted">No itinerary loaded yet.</p>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -73,7 +73,7 @@ export default function EditItemSheet({ item, onClose }: EditItemSheetProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
+    <div className="fixed inset-0 z-[60] flex items-end">
       <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface rounded-t-2xl border-t border-border w-full max-w-lg mx-auto p-4 pb-8">
         <div className="w-10 h-1 bg-border rounded-full mx-auto mb-4" />
