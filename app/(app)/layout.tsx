@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Sun, Package, ShoppingCart, Map, MessageCircle } from 'lucide-react'
 import ThemeToggle from '@/components/theme-toggle'
+import PageTransition from '@/components/page-transition'
 
 const tabs = [
   { label: 'Today',  href: '/',       icon: Sun },
@@ -29,8 +30,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Page content */}
-      <main className="flex-1 overflow-y-auto pb-16">
-        {children}
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <PageTransition>{children}</PageTransition>
       </main>
 
       {/* Bottom tab bar */}
