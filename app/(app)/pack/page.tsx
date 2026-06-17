@@ -1,10 +1,13 @@
-export default function PackPage() {
+import { getPackData } from '@/lib/pack'
+import PackScreen from '@/components/pack/pack-screen'
+
+export default async function PackPage() {
+  const { profile, categoriesWithItems, packed } = await getPackData()
   return (
-    <div className="p-4">
-      <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text mb-2">
-        Pack
-      </h1>
-      <p className="text-text-muted font-mono text-sm">Coming in M3</p>
-    </div>
+    <PackScreen
+      profile={profile}
+      categoriesWithItems={categoriesWithItems}
+      initialPacked={packed}
+    />
   )
 }
