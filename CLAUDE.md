@@ -10,7 +10,7 @@ A **docs-only build package** for **YakPack** — a two-person Spiti trip compan
 2. Paste `06_claude_code_prompt.md` into Claude Code to kick off the build.
 3. Build milestone by milestone (M0 → M7 core, then M8–M9 optionally).
 
-Deploy the skeleton to `yakpack.kyrex.org` at M0 — iterate live from there.
+Deploy the skeleton to `yakpack.tech` at M0 — iterate live from there.
 
 ---
 
@@ -38,7 +38,7 @@ supabase db push     # apply migrations
 | M4 | Today + weather | Open-Meteo hero, weather-reactive carry chips, heads-up, warnings |
 | M5 | To-Buy + progress | `to_buy` filter, overall/person/category progress bars |
 | M6 | Plan + Pemba | 9-day timeline, mascot moods, full design + motion pass |
-| M7 | PWA + deploy | next-pwa, Lighthouse ≥ 90, `yakpack.kyrex.org` live, two-phone verified |
+| M7 | PWA + deploy | next-pwa, Lighthouse ≥ 90, `yakpack.tech` live, two-phone verified |
 | M8 | AI layer | Azure OpenAI: `/api/ai/briefing`, `/chat`, `/gaps`; gated by `AI_ENABLED` |
 | M9 | Voice + import | MAI-Voice TTS, MAI-Transcribe STT; `/api/itinerary/import`; gated by `VOICE_ENABLED` |
 
@@ -52,7 +52,7 @@ The rule-based fallback must stay green throughout. M8 and M9 are enhancements, 
 [ Browser — two phones ]
         │ HTTPS
         ▼
-[ Next.js 16 App Router @ yakpack.kyrex.org ]
+[ Next.js 16 App Router @ yakpack.tech ]
     ├─ Server Components: initial auth render, data fetching
     ├─ Route Handlers:
     │     /api/weather        — Open-Meteo proxy, 30–60 min cache
@@ -218,10 +218,10 @@ AZURE_STT_MODEL=MAI-Transcribe-1.5
 
 ## Deployment
 
-**Vercel (primary):** push to GitHub → import → set env vars → Domains → add `yakpack.kyrex.org` → CNAME `yakpack` → `cname.vercel-dns.com`.
+**Vercel (primary):** push to GitHub → import → set env vars → Domains → add `yakpack.tech` → CNAME `yakpack` → `cname.vercel-dns.com`.
 
 **Self-host (Docker + Caddy):**
 ```caddy
-yakpack.kyrex.org { reverse_proxy app:3000 }
+yakpack.tech { reverse_proxy app:3000 }
 ```
 A record: `yakpack` → server IP. Use Next.js standalone output.
