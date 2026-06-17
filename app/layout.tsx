@@ -1,6 +1,7 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { ThemeProvider } from 'next-themes'
 import { Syne, DM_Sans, DM_Mono } from 'next/font/google'
+import SwRegister from '@/components/sw-register'
 import '@/styles/tokens.css'
 import './globals.css'
 
@@ -24,8 +25,20 @@ const dmMono = DM_Mono({
 
 export const metadata: Metadata = {
   title: 'YakPack',
-  description: 'Haul it like a yak.',
-  manifest: '/manifest.json',
+  description: 'Two-person Spiti trip companion. Haul it like a yak.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'YakPack',
+  },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#d4943a',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -44,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           {children}
         </ThemeProvider>
+        <SwRegister />
       </body>
     </html>
   )
