@@ -34,18 +34,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 inset-x-0 flex bg-surface border-t border-border z-50">
+      <nav aria-label="Main navigation" className="fixed bottom-0 inset-x-0 flex bg-surface border-t border-border z-50">
         {tabs.map(({ label, href, icon: Icon }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
+              aria-current={active ? 'page' : undefined}
+              aria-label={label}
               className={`flex-1 flex flex-col items-center justify-center min-h-[56px] gap-0.5 text-xs font-body
                 ${active ? 'text-accent' : 'text-text-muted hover:text-text transition-colors'}`}
             >
-              <Icon size={20} aria-hidden />
-              <span>{label}</span>
+              <Icon size={20} aria-hidden="true" />
+              <span aria-hidden="true">{label}</span>
             </Link>
           )
         })}
