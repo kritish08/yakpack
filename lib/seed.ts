@@ -208,29 +208,29 @@ function parseItinerary(content: string): ItineraryInsert[] {
     // Strip markdown formatting from leg text
     const leg = legRaw ? legRaw.replace(/\*\*/g, '').replace(/_/g, '').trim() : dayTitle
 
-    // coords — parse the first coordinate pair
-    // Pattern: "CityName 28.61, 77.21" or "CityName 28.61, 77.21 → ..."
+    // coords — parse the LAST coordinate pair (destination / overnight location)
+    // Pattern: "CityA 28.61, 77.21 → CityB 31.10, 77.17" — last pair = destination
     const coordsRaw = getField('coords')
     let lat = 0
     let lon = 0
     if (coordsRaw) {
-      // Match first occurrence of "number, number" (lat, lon)
-      const coordMatch = coordsRaw.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/)
-      if (coordMatch) {
-        lat = parseFloat(coordMatch[1])
-        lon = parseFloat(coordMatch[2])
+      const allCoords = [...coordsRaw.matchAll(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/g)]
+      if (allCoords.length > 0) {
+        const last = allCoords[allCoords.length - 1]
+        lat = parseFloat(last[1])
+        lon = parseFloat(last[2])
       }
     }
 
-    // altitude — extract first integer (in metres)
+    // altitude — extract the LAST number (destination altitude in a range like "216 m → 2,200 m")
     const altRaw = getField('altitude')
     let altitude_m: number | null = null
     if (altRaw) {
-      // Look for patterns like "216 m", "~2,700–3,450 m", "Sangla ~2,700 m"
-      // Extract first plain number (ignoring ~, commas, ranges)
-      const altMatch = altRaw.match(/~?(\d[\d,]*)/)
-      if (altMatch) {
-        altitude_m = parseInt(altMatch[1].replace(',', ''), 10)
+      // Find all numbers in the altitude string, take the last one
+      const allNums = [...altRaw.matchAll(/(\d[\d,]*)/g)]
+      if (allNums.length > 0) {
+        const last = allNums[allNums.length - 1]
+        altitude_m = parseInt(last[1].replace(/,/g, ''), 10)
       }
     }
 
@@ -387,11 +387,16 @@ async function main() {
 
   // ── 1. Delete existing data (idempotent: delete-then-reinsert) ────────────
   console.log('Clearing existing data...')
-  await supabase.from('packed').delete().neq('item_id', '00000000-0000-0000-0000-000000000000')
-  await supabase.from('items').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-  await supabase.from('categories').delete().neq('id', 0)
-  await supabase.from('itinerary').delete().neq('day', 0)
-  await supabase.from('trip').delete().eq('id', 1)
+  const deletes: Array<{ table: string; error: unknown }> = [
+    { table: 'packed',    error: (await supabase.from('packed').delete().neq('item_id', '00000000-0000-0000-0000-000000000000')).error },
+    { table: 'items',     error: (await supabase.from('items').delete().neq('id', '00000000-0000-0000-0000-000000000000')).error },
+    { table: 'categories',error: (await supabase.from('categories').delete().neq('id', 0)).error },
+    { table: 'itinerary', error: (await supabase.from('itinerary').delete().neq('day', 0)).error },
+    { table: 'trip',      error: (await supabase.from('trip').delete().eq('id', 1)).error },
+  ]
+  for (const { table, error } of deletes) {
+    if (error) { console.error(`ERROR clearing ${table}:`, error); process.exit(1) }
+  }
 
   // ── 2. Insert categories ──────────────────────────────────────────────────
   console.log(`Inserting ${categories.length} categories...`)
