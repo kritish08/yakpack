@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import CategoryCard from './category-card'
-import type { CategoryWithItems, Packed, Profile } from '@/lib/pack'
+import EditItemSheet from './edit-item-sheet'
+import type { CategoryWithItems, Item, Packed, Profile } from '@/lib/pack'
 import type { Database } from '@/lib/database.types'
+import { deleteItem } from '@/app/actions/items'
 
 type PackedInsert = Database['public']['Tables']['packed']['Insert']
 
@@ -16,6 +18,7 @@ interface PackScreenProps {
 
 export default function PackScreen({ profile, categoriesWithItems, initialPacked }: PackScreenProps) {
   const [packed, setPacked] = useState<Packed[]>(initialPacked)
+  const [editingItem, setEditingItem] = useState<Item | null>(null)
   const supabase = createClient()
 
   // Realtime subscription — reconcile with server state
@@ -57,6 +60,14 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
     }
   }, [supabase])
 
+  const handleDelete = useCallback(async (itemId: string) => {
+    const ok = window.confirm('Delete this item? This cannot be undone.')
+    if (!ok) return
+    // Optimistically remove packed rows for this item
+    setPacked(prev => prev.filter(p => p.item_id !== itemId))
+    await deleteItem(itemId)
+  }, [])
+
   const totalItems = categoriesWithItems.reduce((s, c) => s + c.items.length, 0)
   const totalPacked = categoriesWithItems.reduce((s, c) => {
     return s + c.items.filter(item => {
@@ -67,32 +78,42 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
   const pct = totalItems > 0 ? Math.round((totalPacked / totalItems) * 100) : 0
 
   return (
-    <div className="px-4 pt-4 pb-6 flex flex-col gap-3">
-      {/* Header + overall progress */}
-      <div>
-        <div className="flex items-baseline justify-between mb-1">
-          <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text">Pack</h1>
-          <span className="font-mono text-sm text-text-muted">{totalPacked}/{totalItems}</span>
+    <>
+      <div className="px-4 pt-4 pb-6 flex flex-col gap-3">
+        {/* Header + overall progress */}
+        <div>
+          <div className="flex items-baseline justify-between mb-1">
+            <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text">Pack</h1>
+            <span className="font-mono text-sm text-text-muted">{totalPacked}/{totalItems}</span>
+          </div>
+          <div className="h-1.5 bg-border rounded-full overflow-hidden">
+            <div
+              className="h-full bg-accent transition-all duration-500 rounded-full"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="font-mono text-xs text-text-muted mt-1">{pct}% packed</p>
         </div>
-        <div className="h-1.5 bg-border rounded-full overflow-hidden">
-          <div
-            className="h-full bg-accent transition-all duration-500 rounded-full"
-            style={{ width: `${pct}%` }}
+
+        {/* Category cards */}
+        {categoriesWithItems.map(cat => (
+          <CategoryCard
+            key={cat.id}
+            category={cat}
+            packed={packed}
+            profile={profile}
+            onToggle={handleToggle}
+            onEdit={item => setEditingItem(item)}
+            onDelete={handleDelete}
           />
-        </div>
-        <p className="font-mono text-xs text-text-muted mt-1">{pct}% packed</p>
+        ))}
       </div>
 
-      {/* Category cards */}
-      {categoriesWithItems.map(cat => (
-        <CategoryCard
-          key={cat.id}
-          category={cat}
-          packed={packed}
-          profile={profile}
-          onToggle={handleToggle}
-        />
-      ))}
-    </div>
+      {/* Edit item bottom sheet */}
+      <EditItemSheet
+        item={editingItem}
+        onClose={() => setEditingItem(null)}
+      />
+    </>
   )
 }
