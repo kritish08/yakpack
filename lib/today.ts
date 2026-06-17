@@ -42,11 +42,19 @@ export async function getTodayData() {
   return { todayLeg, legs, items, profile, isToday, isFuture, isPast }
 }
 
-export async function fetchWeather(lat: number, lon: number, baseUrl: string): Promise<WeatherData | null> {
+// Calls Open-Meteo directly — avoids SSRF from trusting Host header to build an internal URL.
+// The /api/weather route handler exists for client-side fetches; server components skip it.
+export async function fetchWeather(lat: number, lon: number): Promise<WeatherData | null> {
   try {
-    const res = await fetch(`${baseUrl}/api/weather?lat=${lat}&lon=${lon}`, {
-      next: { revalidate: 1800 },
-    })
+    const url = new URL('https://api.open-meteo.com/v1/forecast')
+    url.searchParams.set('latitude', String(lat))
+    url.searchParams.set('longitude', String(lon))
+    url.searchParams.set('current', 'temperature_2m,weather_code,apparent_temperature,wind_speed_10m')
+    url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max')
+    url.searchParams.set('timezone', 'Asia/Kolkata')
+    url.searchParams.set('forecast_days', '1')
+
+    const res = await fetch(url.toString(), { next: { revalidate: 1800 } })
     if (!res.ok) return null
     return await res.json()
   } catch {
