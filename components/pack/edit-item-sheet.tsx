@@ -8,13 +8,15 @@ import type { Item } from '@/lib/pack'
 interface EditItemSheetProps {
   item: Item | null
   onClose: () => void
+  onSaved?: (itemId: string, changes: Partial<Item>) => void
+  onDeleted?: (itemId: string) => void
 }
 
 const inputClass =
   'bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent transition-colors w-full'
 const labelClass = 'block font-mono text-xs text-text-muted mb-1'
 
-export default function EditItemSheet({ item, onClose }: EditItemSheetProps) {
+export default function EditItemSheet({ item, onClose, onSaved, onDeleted }: EditItemSheetProps) {
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
@@ -40,15 +42,17 @@ export default function EditItemSheet({ item, onClose }: EditItemSheetProps) {
   async function handleSave() {
     if (!item || !name.trim()) return
     setSaving(true)
+    const changes = {
+      name: name.trim(),
+      qty: qty.trim() || null,
+      note: note.trim() || null,
+      status,
+      assigned_to: assignedTo,
+      scope,
+    }
     try {
-      await updateItem(item.id, {
-        name: name.trim(),
-        qty: qty.trim() || null,
-        note: note.trim() || null,
-        status,
-        assigned_to: assignedTo,
-        scope,
-      })
+      await updateItem(item.id, changes)
+      onSaved?.(item.id, changes)
       onClose()
     } catch (e) {
       console.error(e)
@@ -64,6 +68,7 @@ export default function EditItemSheet({ item, onClose }: EditItemSheetProps) {
     setDeleting(true)
     try {
       await deleteItem(item.id)
+      onDeleted?.(item.id)
       onClose()
     } catch (e) {
       console.error(e)
@@ -71,6 +76,10 @@ export default function EditItemSheet({ item, onClose }: EditItemSheetProps) {
       setDeleting(false)
     }
   }
+
+  // Detect which role is "individual" — assignedTo is either the user's role or partner's role
+  // We simplify: show Individual / Shared only, where Individual = assignedTo stays as-is (non-shared)
+  const isShared = assignedTo === 'shared'
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end">
@@ -102,14 +111,28 @@ export default function EditItemSheet({ item, onClose }: EditItemSheetProps) {
               </select>
             </div>
           </div>
+
+          {/* Who carries it */}
           <div>
-            <label className={labelClass}>Assigned To</label>
-            <select value={assignedTo} onChange={e => setAssignedTo(e.target.value as 'kritish' | 'partner' | 'shared')} className={inputClass}>
-              <option value="kritish">Kritish</option>
-              <option value="partner">Partner</option>
-              <option value="shared">Shared</option>
-            </select>
+            <label className={labelClass}>Who carries it</label>
+            <div className="flex rounded-lg border border-border overflow-hidden text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setAssignedTo(isShared ? 'kritish' : assignedTo)}
+                className={`flex-1 py-2.5 transition-colors ${!isShared ? 'bg-accent text-bg font-bold' : 'text-text-muted hover:text-text hover:bg-surface-2'}`}
+              >
+                Individual
+              </button>
+              <button
+                type="button"
+                onClick={() => setAssignedTo('shared')}
+                className={`flex-1 py-2.5 transition-colors ${isShared ? 'bg-accent text-bg font-bold' : 'text-text-muted hover:text-text hover:bg-surface-2'}`}
+              >
+                Shared
+              </button>
+            </div>
           </div>
+
           <div>
             <label className={labelClass}>Note</label>
             <input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="Optional note" className={inputClass} />

@@ -18,8 +18,12 @@ interface PackScreenProps {
 
 export default function PackScreen({ profile, categoriesWithItems, initialPacked }: PackScreenProps) {
   const [packed, setPacked] = useState<Packed[]>(initialPacked)
+  const [categories, setCategories] = useState<CategoryWithItems[]>(categoriesWithItems)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const supabase = createClient()
+
+  // Sync when server pushes new RSC payload after revalidatePath
+  useEffect(() => { setCategories(categoriesWithItems) }, [categoriesWithItems])
 
   useEffect(() => {
     const channel = supabase
@@ -41,13 +45,9 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
   const handleToggle = useCallback(async (itemId: string, userKey: string, isPacked: boolean) => {
     if (isPacked) {
       setPacked(prev => prev.filter(p => !(p.item_id === itemId && p.user_key === userKey)))
-    } else {
-      const optimistic: Packed = { item_id: itemId, user_key: userKey, packed: true, packed_at: new Date().toISOString() }
-      setPacked(prev => [...prev, optimistic])
-    }
-    if (isPacked) {
       await supabase.from('packed').delete().eq('item_id', itemId).eq('user_key', userKey)
     } else {
+      setPacked(prev => [...prev, { item_id: itemId, user_key: userKey, packed: true, packed_at: new Date().toISOString() }])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase.from('packed') as any).insert({ item_id: itemId, user_key: userKey, packed: true } as PackedInsert)
     }
@@ -56,17 +56,29 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
   const handleDelete = useCallback(async (itemId: string) => {
     const ok = window.confirm('Delete this item? This cannot be undone.')
     if (!ok) return
+    setCategories(prev => prev.map(c => ({ ...c, items: c.items.filter(i => i.id !== itemId) })))
     setPacked(prev => prev.filter(p => p.item_id !== itemId))
     await deleteItem(itemId)
   }, [])
 
-  const totalItems = categoriesWithItems.reduce((s, c) => s + c.items.length, 0)
-  const totalPacked = categoriesWithItems.reduce((s, c) => {
-    return s + c.items.filter(item => {
+  const handleItemSaved = useCallback((itemId: string, changes: Partial<Item>) => {
+    setCategories(prev => prev.map(c => ({
+      ...c,
+      items: c.items.map(i => i.id === itemId ? { ...i, ...changes } : i),
+    })))
+  }, [])
+
+  const handleItemDeleted = useCallback((itemId: string) => {
+    setCategories(prev => prev.map(c => ({ ...c, items: c.items.filter(i => i.id !== itemId) })))
+    setPacked(prev => prev.filter(p => p.item_id !== itemId))
+  }, [])
+
+  const totalItems = categories.reduce((s, c) => s + c.items.length, 0)
+  const totalPacked = categories.reduce((s, c) =>
+    s + c.items.filter(item => {
       const key = item.scope === 'each' ? profile.role : 'shared'
       return packed.some(p => p.item_id === item.id && p.user_key === key)
-    }).length
-  }, 0)
+    }).length, 0)
   const pct = totalItems > 0 ? Math.round((totalPacked / totalItems) * 100) : 0
 
   return (
@@ -82,7 +94,7 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
           </div>
           <p className="font-mono text-xs text-text-muted mt-1">{pct}% packed</p>
         </div>
-        {categoriesWithItems.map(cat => (
+        {categories.map(cat => (
           <CategoryCard
             key={cat.id}
             category={cat}
@@ -94,7 +106,12 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
           />
         ))}
       </div>
-      <EditItemSheet item={editingItem} onClose={() => setEditingItem(null)} />
+      <EditItemSheet
+        item={editingItem}
+        onClose={() => setEditingItem(null)}
+        onSaved={handleItemSaved}
+        onDeleted={handleItemDeleted}
+      />
     </>
   )
 }

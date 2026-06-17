@@ -9,7 +9,7 @@ import PageTransition from '@/components/page-transition'
 const tabs = [
   { label: 'Today',  href: '/',       icon: Sun },
   { label: 'Pack',   href: '/pack',   icon: Package },
-  { label: 'To-Buy', href: '/to-buy', icon: ShoppingCart },
+  { label: 'Summary', href: '/to-buy', icon: ShoppingCart },
   { label: 'Plan',   href: '/plan',   icon: Map },
   { label: 'Ask',    href: '/ask',    icon: MessageCircle },
 ]

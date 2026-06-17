@@ -107,16 +107,27 @@ export default function CategoryCard({ category, packed, profile, onToggle, onEd
               />
               <div className="flex gap-2">
                 <input type="text" value={newQty} onChange={e => setNewQty(e.target.value)} placeholder="Qty" className={`${inputClass} w-20 shrink-0`} />
-                <select value={newAssignedTo} onChange={e => setNewAssignedTo(e.target.value as 'kritish' | 'partner' | 'shared')} className={`${inputClass} flex-1`}>
-                  <option value="kritish">Kritish</option>
-                  <option value="partner">Partner</option>
-                  <option value="shared">Shared</option>
-                </select>
                 <select value={newStatus} onChange={e => setNewStatus(e.target.value as 'owned' | 'to_buy' | 'standard')} className={`${inputClass} flex-1`}>
                   <option value="owned">Owned</option>
                   <option value="to_buy">To Buy</option>
                   <option value="standard">Standard</option>
                 </select>
+              </div>
+              {/* Who carries it — pill toggle */}
+              <div className="flex rounded-lg border border-border overflow-hidden text-xs font-mono">
+                {([
+                  { v: profile.role, label: 'Individual' },
+                  { v: 'shared', label: 'Shared' },
+                ] as { v: 'kritish' | 'partner' | 'shared'; label: string }[]).map(({ v, label }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setNewAssignedTo(v)}
+                    className={`flex-1 py-2 transition-colors ${newAssignedTo === v ? 'bg-accent text-bg font-bold' : 'text-text-muted hover:text-text hover:bg-surface-2'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
               <div className="flex gap-2">
                 <button type="submit" disabled={isPending || !newName.trim()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-bg font-body text-xs font-medium disabled:opacity-50 min-h-[36px]">

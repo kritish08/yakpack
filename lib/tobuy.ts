@@ -6,6 +6,7 @@ export type Item = Database['public']['Tables']['items']['Row']
 export type Category = Database['public']['Tables']['categories']['Row']
 export type Packed = Database['public']['Tables']['packed']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
+export type Trip = Database['public']['Tables']['trip']['Row']
 
 export type CategoryWithToBuy = Category & { items: Item[] }
 
@@ -20,12 +21,13 @@ export async function getToBuyData() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const [profileRes, categoriesRes, allItemsRes, toBuyItemsRes, packedRes] = await Promise.all([
+  const [profileRes, categoriesRes, allItemsRes, toBuyItemsRes, packedRes, tripRes] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('categories').select('*').order('sort_order'),
     supabase.from('items').select('*').order('sort_order'),
     supabase.from('items').select('*').eq('status', 'to_buy').order('sort_order'),
     supabase.from('packed').select('*'),
+    supabase.from('trip').select('*').eq('id', 1).single(),
   ])
 
   const profile = profileRes.data!
@@ -33,14 +35,13 @@ export async function getToBuyData() {
   const allItems = (allItemsRes.data ?? []) as Item[]
   const toBuyItems = (toBuyItemsRes.data ?? []) as Item[]
   const packed = (packedRes.data ?? []) as Packed[]
+  const trip = tripRes.data as Trip | null
 
-  // Group to-buy items by category
   const categoriesWithToBuy: CategoryWithToBuy[] = categories
-    .map(cat => ({
-      ...cat,
-      items: toBuyItems.filter(i => i.category_id === cat.id),
-    }))
+    .map(cat => ({ ...cat, items: toBuyItems.filter(i => i.category_id === cat.id) }))
     .filter(cat => cat.items.length > 0)
 
-  return { profile, categories, allItems, categoriesWithToBuy, packed }
+  const today = new Date().toISOString().slice(0, 10)
+
+  return { profile, categories, allItems, categoriesWithToBuy, packed, trip, today }
 }
