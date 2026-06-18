@@ -1,4 +1,4 @@
-import { createAzure } from '@ai-sdk/azure'
+import { createOpenAI } from '@ai-sdk/openai'
 
 export const AI_ENABLED = process.env.AI_ENABLED === 'true'
 
@@ -16,19 +16,18 @@ MEDICAL SAFETY: You may discuss altitude acclimatisation, AMS symptoms, rest day
 Keep responses under 120 words unless the user explicitly asks for more detail.`
 
 export function getAzureModel() {
-  const rawEndpoint = process.env.AZURE_OPENAI_ENDPOINT ?? ''
-  // Strip trailing /v1 — SDK appends it automatically
-  const baseURL = rawEndpoint.replace(/\/v1\/?$/, '')
-
-  const azure = createAzure({
-    baseURL,
-    apiKey: process.env.AZURE_OPENAI_API_KEY!,
-    // Do NOT set apiVersion — the new *.services.ai.azure.com endpoint
-    // uses OpenAI-compatible routing and doesn't accept api-version param
-  })
-
+  // New Azure AI Foundry endpoint (*.services.ai.azure.com/openai/v1) is
+  // OpenAI-compatible — use createOpenAI so it hits /v1/chat/completions or
+  // /v1/responses directly, not /deployments/{name}/... (the old Azure path).
+  const baseURL = process.env.AZURE_OPENAI_ENDPOINT ?? ''
   const deployment = process.env.AZURE_OPENAI_DEPLOYMENT ?? 'gpt-4o'
   const useResponses = process.env.AZURE_USE_RESPONSES_API === 'true'
-  console.log(`[ai] endpoint=${baseURL} deployment=${deployment} responses=${useResponses}`)
-  return useResponses ? azure.responses(deployment) : azure(deployment)
+  console.log(`[ai] baseURL=${baseURL} deployment=${deployment} responses=${useResponses}`)
+
+  const client = createOpenAI({
+    baseURL,
+    apiKey: process.env.AZURE_OPENAI_API_KEY!,
+  })
+
+  return useResponses ? client.responses(deployment) : client(deployment)
 }
