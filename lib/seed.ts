@@ -26,7 +26,7 @@ interface CategoryInsert {
   icon: string | null
 }
 
-interface ItemInsert {
+export interface ItemInsert {
   // category_id filled in after category upsert
   category_sort_order: number
   name: string
@@ -81,7 +81,7 @@ const SKIP_SECTIONS = new Set([
  * Parse docs/01_packing_list_master.md
  * Returns { categories, items, trip }
  */
-function parsePackingList(content: string): {
+export function parsePackingList(content: string): {
   categories: CategoryInsert[]
   items: ItemInsert[]
   trip: TripInsert
@@ -491,7 +491,15 @@ async function main() {
   console.log(`  Trip row:       1`)
 }
 
-main().catch((err) => {
-  console.error('Seed failed:', err)
-  process.exit(1)
-})
+// Only run the destructive seed when this file is executed directly
+// (e.g. `pnpm seed`). Importing parsePackingList from here must NOT seed.
+const invokedDirectly =
+  process.argv[1] != null &&
+  /(?:^|[\\/])seed\.[tj]s$/.test(process.argv[1])
+
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error('Seed failed:', err)
+    process.exit(1)
+  })
+}
