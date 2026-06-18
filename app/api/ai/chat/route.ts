@@ -19,6 +19,9 @@ export async function POST(req: Request) {
   const { messages } = await req.json()
 
   const result = streamText({
+    onError: (err) => {
+      console.error('[chat] streamText error:', JSON.stringify(err, null, 2))
+    },
     model: getAzureModel(),
     system: PEMBA_SYSTEM,
     messages: await convertToModelMessages(messages),

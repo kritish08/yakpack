@@ -16,17 +16,19 @@ MEDICAL SAFETY: You may discuss altitude acclimatisation, AMS symptoms, rest day
 Keep responses under 120 words unless the user explicitly asks for more detail.`
 
 export function getAzureModel() {
-  // Strip trailing /v1 if present — the SDK appends it automatically
-  const baseURL = (process.env.AZURE_OPENAI_ENDPOINT ?? '').replace(/\/v1\/?$/, '')
+  const rawEndpoint = process.env.AZURE_OPENAI_ENDPOINT ?? ''
+  // Strip trailing /v1 — SDK appends it automatically
+  const baseURL = rawEndpoint.replace(/\/v1\/?$/, '')
 
   const azure = createAzure({
     baseURL,
     apiKey: process.env.AZURE_OPENAI_API_KEY!,
-    apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? '2024-10-21',
+    // Do NOT set apiVersion — the new *.services.ai.azure.com endpoint
+    // uses OpenAI-compatible routing and doesn't accept api-version param
   })
 
   const deployment = process.env.AZURE_OPENAI_DEPLOYMENT ?? 'gpt-4o'
-  // gpt-5.x models use the Responses API (/v1/responses), not Chat Completions
   const useResponses = process.env.AZURE_USE_RESPONSES_API === 'true'
+  console.log(`[ai] endpoint=${baseURL} deployment=${deployment} responses=${useResponses}`)
   return useResponses ? azure.responses(deployment) : azure(deployment)
 }
