@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Check, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, Check, Pencil, Trash2, X, Sparkles } from 'lucide-react'
 import type { CategoryWithToBuy, Item, Packed, Profile, Category, Trip } from '@/lib/tobuy'
 import { overallProgress, personProgress, categoryProgress } from '@/lib/progress'
 import { addItem, updateItem, deleteItem } from '@/app/actions/items'
+import { addCategory, updateCategory, deleteCategory } from '@/app/actions/categories'
 
 // ── Chips ──────────────────────────────────────────────────────────────────────
 const assignedChip: Record<string, { label: string; cls: string }> = {
@@ -23,16 +24,23 @@ interface SummaryScreenProps {
   packed:               Packed[]
   trip:                 Trip | null
   today:                string
+  aiEnabled?:           boolean
 }
 
 type AssignedTo = 'kritish' | 'partner' | 'shared'
 type SheetState = { mode: 'add' } | { mode: 'edit'; item: Item }
+type CatSheetState = { mode: 'add' } | { mode: 'edit'; cat: Category }
 
 interface FormState {
   name:        string
   qty:         string
   category_id: number
   assigned_to: AssignedTo
+}
+
+interface CatFormState {
+  name: string
+  icon: string
 }
 
 // ── Trip countdown chip ────────────────────────────────────────────────────────
@@ -46,9 +54,27 @@ function TripChip({ trip, today }: { trip: Trip | null; today: string }) {
   return <span className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-accent-2/10 text-accent-2 border border-accent-2/30">Day {Math.abs(diff) + 1} of 9</span>
 }
 
+// ── Bottom sheet wrapper ────────────────────────────────────────────────────────
+function BottomSheet({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col justify-end"
+      style={{ paddingBottom: 56 }}
+    >
+      <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative bg-surface rounded-t-2xl border-t border-border w-full max-w-lg mx-auto flex flex-col overflow-hidden"
+        style={{ maxHeight: 'calc(100dvh - 76px)' }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function SummaryScreen({
-  profile, categories, allItems, categoriesWithToBuy, packed, trip, today,
+  profile, categories, allItems, categoriesWithToBuy, packed, trip, today, aiEnabled,
 }: SummaryScreenProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -58,24 +84,39 @@ export default function SummaryScreen({
     () => categoriesWithToBuy.flatMap(c => c.items)
   )
 
+  // Local copy of categories for CRUD
+  const [localCategories, setLocalCategories] = useState<Category[]>(categories)
+
   // Sync when server re-fetches (router.refresh)
   useEffect(() => {
     setToBuyItems(categoriesWithToBuy.flatMap(c => c.items))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoriesWithToBuy])
 
-  // Sheet state
-  const [sheet, setSheet] = useState<SheetState | null>(null)
-  const [form,  setForm]  = useState<FormState>({
+  useEffect(() => {
+    setLocalCategories(categories)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories])
+
+  // ── Item sheet state ─────────────────────────────────────────────────────────
+  const [sheet,    setSheet]    = useState<SheetState | null>(null)
+  const [form,     setForm]     = useState<FormState>({
     name:        '',
     qty:         '',
     category_id: (categories[0]?.id as number) ?? 1,
     assigned_to: 'shared',
   })
-  const [isSaving, setIsSaving] = useState(false)
+  const [isSaving,     setIsSaving]     = useState(false)
+  const [isSuggesting, setIsSuggesting] = useState(false)
+
+  // ── Category sheet state ─────────────────────────────────────────────────────
+  const [catSheet,   setCatSheet]   = useState<CatSheetState | null>(null)
+  const [catForm,    setCatForm]    = useState<CatFormState>({ name: '', icon: '' })
+  const [isCatSaving, setIsCatSaving] = useState(false)
+  const [catError,    setCatError]   = useState<string | null>(null)
 
   // Grouped view
-  const localCatsWithToBuy: CategoryWithToBuy[] = categories
+  const localCatsWithToBuy: CategoryWithToBuy[] = localCategories
     .map(cat => ({ ...cat, items: toBuyItems.filter(i => i.category_id === cat.id) }))
     .filter(cat => cat.items.length > 0)
 
@@ -91,9 +132,9 @@ export default function SummaryScreen({
   const mePct = me.total      > 0 ? Math.round((me.done      / me.total)      * 100) : 0
   const ptPct = partner.total > 0 ? Math.round((partner.done / partner.total) * 100) : 0
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
+  // ── Item sheet handlers ──────────────────────────────────────────────────────
   function openAdd() {
-    setForm({ name: '', qty: '', category_id: (categories[0]?.id as number) ?? 1, assigned_to: 'shared' })
+    setForm({ name: '', qty: '', category_id: (localCategories[0]?.id as number) ?? 1, assigned_to: 'shared' })
     setSheet({ mode: 'add' })
   }
 
@@ -101,10 +142,37 @@ export default function SummaryScreen({
     setForm({
       name:        item.name,
       qty:         item.qty ?? '',
-      category_id: item.category_id ?? ((categories[0]?.id as number) ?? 1),
+      category_id: item.category_id ?? ((localCategories[0]?.id as number) ?? 1),
       assigned_to: (item.assigned_to as AssignedTo) ?? 'shared',
     })
     setSheet({ mode: 'edit', item })
+  }
+
+  async function handlePembaSuggest() {
+    if (!form.name.trim()) return
+    setIsSuggesting(true)
+    try {
+      const res = await fetch('/api/ai/parse-item', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text: form.name, categories: localCategories.map(c => ({ id: c.id, name: c.name })) }),
+      })
+      if (!res.ok) return
+      const { items } = await res.json()
+      if (items?.[0]) {
+        const suggestion = items[0]
+        const matchedCat = suggestion.suggested_category
+          ? localCategories.find(c => c.name.toLowerCase() === suggestion.suggested_category.toLowerCase())
+          : null
+        setForm(f => ({
+          ...f,
+          qty:         suggestion.qty        ?? f.qty,
+          assigned_to: suggestion.assigned_to ?? f.assigned_to,
+          category_id: matchedCat?.id         ?? f.category_id,
+        }))
+      }
+    } catch { /* silently ignore */ }
+    finally { setIsSuggesting(false) }
   }
 
   async function handleSave() {
@@ -123,7 +191,6 @@ export default function SummaryScreen({
         startTransition(() => router.refresh())
       } else if (sheet?.mode === 'edit') {
         const { item } = sheet
-        // Optimistic update
         setToBuyItems(prev => prev.map(i =>
           i.id === item.id
             ? { ...i, name: form.name.trim(), qty: form.qty || null, category_id: form.category_id, assigned_to: form.assigned_to }
@@ -143,17 +210,72 @@ export default function SummaryScreen({
   }
 
   function handleMarkBought(item: Item) {
-    setToBuyItems(prev => prev.filter(i => i.id !== item.id)) // optimistic remove
+    setToBuyItems(prev => prev.filter(i => i.id !== item.id))
     updateItem(item.id, { status: 'owned' }).catch(() => {
-      setToBuyItems(prev => [...prev, item]) // revert on error
+      setToBuyItems(prev => [...prev, item])
     })
   }
 
   function handleDelete(item: Item) {
-    setToBuyItems(prev => prev.filter(i => i.id !== item.id)) // optimistic remove
+    setToBuyItems(prev => prev.filter(i => i.id !== item.id))
     deleteItem(item.id).catch(() => {
-      setToBuyItems(prev => [...prev, item]) // revert on error
+      setToBuyItems(prev => [...prev, item])
     })
+  }
+
+  // ── Category sheet handlers ──────────────────────────────────────────────────
+  function openCatAdd() {
+    setCatForm({ name: '', icon: '' })
+    setCatError(null)
+    setCatSheet({ mode: 'add' })
+  }
+
+  function openCatEdit(cat: Category) {
+    setCatForm({ name: cat.name, icon: cat.icon ?? '' })
+    setCatError(null)
+    setCatSheet({ mode: 'edit', cat })
+  }
+
+  async function handleCatSave() {
+    if (!catForm.name.trim()) return
+    setIsCatSaving(true)
+    setCatError(null)
+    try {
+      if (catSheet?.mode === 'add') {
+        await addCategory({ name: catForm.name.trim(), icon: catForm.icon.trim() || undefined })
+        startTransition(() => router.refresh())
+      } else if (catSheet?.mode === 'edit') {
+        const { cat } = catSheet
+        setLocalCategories(prev => prev.map(c =>
+          c.id === cat.id ? { ...c, name: catForm.name.trim(), icon: catForm.icon.trim() || null } : c
+        ))
+        await updateCategory(cat.id as number, {
+          name: catForm.name.trim(),
+          icon: catForm.icon.trim() || null,
+        })
+      }
+      setCatSheet(null)
+    } catch (e) {
+      setCatError(String(e))
+    } finally {
+      setIsCatSaving(false)
+    }
+  }
+
+  async function handleCatDelete(cat: Category) {
+    setCatError(null)
+    setIsCatSaving(true)
+    try {
+      setLocalCategories(prev => prev.filter(c => c.id !== cat.id))
+      await deleteCategory(cat.id as number)
+      startTransition(() => router.refresh())
+    } catch (e) {
+      setLocalCategories(prev => [...prev, cat])
+      setCatError(String(e))
+    } finally {
+      setIsCatSaving(false)
+      setCatSheet(null)
+    }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -235,7 +357,6 @@ export default function SummaryScreen({
           <div>
             {localCatsWithToBuy.map(cat => (
               <div key={cat.id}>
-                {/* Category divider */}
                 <div className="px-4 pt-2.5 pb-1 flex items-center gap-2">
                   {cat.icon && <span className="text-sm">{cat.icon}</span>}
                   <span className="font-mono text-[10px] uppercase tracking-wider text-text-dim">{cat.name}</span>
@@ -249,7 +370,6 @@ export default function SummaryScreen({
                       </span>
                       <span className="font-body text-sm text-text flex-1 min-w-0 truncate">{item.name}</span>
                       {item.qty && <span className="font-mono text-xs text-text-muted shrink-0">×{item.qty}</span>}
-                      {/* Action buttons */}
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => handleMarkBought(item)}
@@ -288,7 +408,7 @@ export default function SummaryScreen({
           <p className="font-mono text-[11px] uppercase tracking-wider text-text-muted">By category</p>
         </div>
         <div className="divide-y divide-border/40">
-          {categories.map(cat => {
+          {localCategories.map(cat => {
             const s = categoryProgress(allItems, packed, profile.role, cat.id as number, cat.name)
             if (s.total === 0) return null
             const cp = Math.round((s.done / s.total) * 100)
@@ -308,23 +428,84 @@ export default function SummaryScreen({
         </div>
       </section>
 
-      {/* ── Add / Edit sheet ── */}
-      {sheet && (
-        <div className="fixed inset-0 z-50 flex items-end">
-          <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm" onClick={() => !isSaving && setSheet(null)} />
-          <div className="relative bg-surface rounded-t-2xl border-t border-border w-full max-w-lg mx-auto p-4 pb-8">
-            <div className="w-10 h-1 bg-border rounded-full mx-auto mb-4" />
+      {/* ── Categories CRUD ── */}
+      <section className="bg-surface border border-border rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <p className="font-mono text-[11px] uppercase tracking-wider text-text-muted">Manage categories</p>
+          <button
+            onClick={openCatAdd}
+            className="w-7 h-7 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent hover:bg-accent/20 active:scale-90 transition-all"
+            aria-label="Add category"
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+        {catError && (
+          <div className="px-4 py-2 bg-accent-3/5 border-b border-accent-3/20">
+            <p className="font-mono text-[10px] text-accent-3">{catError}</p>
+          </div>
+        )}
+        <div className="divide-y divide-border/40">
+          {localCategories.map(cat => (
+            <div key={cat.id} className="px-4 py-2.5 flex items-center gap-3">
+              {cat.icon
+                ? <span className="text-base shrink-0 w-6 text-center">{cat.icon}</span>
+                : <span className="shrink-0 w-6 text-center font-mono text-xs text-text-dim">—</span>
+              }
+              <span className="font-body text-sm text-text flex-1 min-w-0 truncate">{cat.name}</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => openCatEdit(cat)}
+                  className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-text hover:border-accent/30 active:scale-90 transition-all"
+                  title="Edit category"
+                >
+                  <Pencil size={11} />
+                </button>
+                <button
+                  onClick={() => handleCatDelete(cat)}
+                  disabled={isCatSaving}
+                  className="w-7 h-7 rounded-full bg-accent-3/10 border border-accent-3/20 flex items-center justify-center text-accent-3 hover:bg-accent-3/20 active:scale-90 transition-all disabled:opacity-40"
+                  title="Delete category"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-            {/* Sheet header */}
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display font-bold text-sm uppercase tracking-tight text-text">
-                {sheet.mode === 'add' ? 'Add to Buy' : 'Edit Item'}
-              </h2>
+      {/* ── Add / Edit item sheet ── */}
+      {sheet && (
+        <BottomSheet onClose={() => !isSaving && setSheet(null)}>
+          {/* Drag handle */}
+          <div className="w-10 h-1 bg-border rounded-full mx-auto mt-3 mb-0 shrink-0" />
+
+          {/* Sheet header */}
+          <div className="flex items-center justify-between px-4 py-3 shrink-0">
+            <h2 className="font-display font-bold text-sm uppercase tracking-tight text-text">
+              {sheet.mode === 'add' ? 'Add to Buy' : 'Edit Item'}
+            </h2>
+            <div className="flex items-center gap-2">
+              {aiEnabled && (
+                <button
+                  onClick={handlePembaSuggest}
+                  disabled={!form.name.trim() || isSuggesting}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent font-mono text-[10px] disabled:opacity-40 active:scale-95 transition-all"
+                  title="Let Pemba suggest category, qty & assignee"
+                >
+                  <Sparkles size={11} className={isSuggesting ? 'animate-pulse' : ''} />
+                  {isSuggesting ? 'Thinking…' : 'Pemba suggest'}
+                </button>
+              )}
               <button onClick={() => setSheet(null)} disabled={isSaving} className="p-1.5 text-text-muted hover:text-text transition-colors">
                 <X size={18} />
               </button>
             </div>
+          </div>
 
+          {/* Scrollable form */}
+          <div className="overflow-y-auto flex-1 px-4 pb-2">
             {/* Name */}
             <div className="mb-3">
               <label className="font-mono text-[10px] uppercase tracking-wider text-text-muted mb-1.5 block">Name *</label>
@@ -352,7 +533,7 @@ export default function SummaryScreen({
             <div className="mb-3">
               <label className="font-mono text-[10px] uppercase tracking-wider text-text-muted mb-1.5 block">Category</label>
               <div className="flex flex-wrap gap-1.5">
-                {categories.map(cat => (
+                {localCategories.map(cat => (
                   <button
                     key={cat.id}
                     onClick={() => setForm(f => ({ ...f, category_id: cat.id as number }))}
@@ -369,7 +550,7 @@ export default function SummaryScreen({
             </div>
 
             {/* Assigned to */}
-            <div className="mb-5">
+            <div className="mb-3">
               <label className="font-mono text-[10px] uppercase tracking-wider text-text-muted mb-1.5 block">For</label>
               <div className="flex gap-2">
                 {(['kritish', 'partner', 'shared'] as const).map(role => (
@@ -387,8 +568,10 @@ export default function SummaryScreen({
                 ))}
               </div>
             </div>
+          </div>
 
-            {/* Actions */}
+          {/* Actions — pinned to bottom of sheet */}
+          <div className="px-4 pb-4 pt-2 border-t border-border/40 shrink-0">
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
@@ -406,7 +589,69 @@ export default function SummaryScreen({
               </button>
             </div>
           </div>
-        </div>
+        </BottomSheet>
+      )}
+
+      {/* ── Add / Edit category sheet ── */}
+      {catSheet && (
+        <BottomSheet onClose={() => !isCatSaving && setCatSheet(null)}>
+          <div className="w-10 h-1 bg-border rounded-full mx-auto mt-3 mb-0 shrink-0" />
+
+          <div className="flex items-center justify-between px-4 py-3 shrink-0">
+            <h2 className="font-display font-bold text-sm uppercase tracking-tight text-text">
+              {catSheet.mode === 'add' ? 'New Category' : 'Edit Category'}
+            </h2>
+            <button onClick={() => setCatSheet(null)} disabled={isCatSaving} className="p-1.5 text-text-muted hover:text-text transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="overflow-y-auto flex-1 px-4 pb-2">
+            {catError && (
+              <p className="font-mono text-[10px] text-accent-3 mb-3 bg-accent-3/5 border border-accent-3/20 rounded-xl px-3 py-2">{catError}</p>
+            )}
+
+            <div className="mb-3">
+              <label className="font-mono text-[10px] uppercase tracking-wider text-text-muted mb-1.5 block">Name *</label>
+              <input
+                value={catForm.name}
+                onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. First Aid"
+                className="w-full h-10 bg-surface-2 border border-border rounded-xl px-3.5 text-sm text-text font-body outline-none focus:border-accent/60 transition-colors placeholder:text-text-dim"
+                autoFocus
+              />
+            </div>
+
+            <div className="mb-3">
+              <label className="font-mono text-[10px] uppercase tracking-wider text-text-muted mb-1.5 block">Icon emoji (optional)</label>
+              <input
+                value={catForm.icon}
+                onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))}
+                placeholder="e.g. 🩺"
+                className="w-full h-10 bg-surface-2 border border-border rounded-xl px-3.5 text-sm text-text font-body outline-none focus:border-accent/60 transition-colors placeholder:text-text-dim"
+              />
+            </div>
+          </div>
+
+          <div className="px-4 pb-4 pt-2 border-t border-border/40 shrink-0">
+            <div className="flex gap-2">
+              <button
+                onClick={handleCatSave}
+                disabled={!catForm.name.trim() || isCatSaving}
+                className="flex-1 py-2.5 rounded-xl bg-accent text-bg font-display font-bold uppercase tracking-tight text-sm disabled:opacity-40 min-h-[44px] transition-opacity"
+              >
+                {isCatSaving ? 'Saving…' : catSheet.mode === 'add' ? 'Add Category' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => setCatSheet(null)}
+                disabled={isCatSaving}
+                className="px-5 py-2.5 rounded-xl bg-surface-2 border border-border text-text-muted font-body text-sm min-h-[44px]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
       )}
     </div>
   )
