@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Search, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import CategoryCard from './category-card'
 import EditItemSheet from './edit-item-sheet'
@@ -20,6 +21,7 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
   const [packed, setPacked] = useState<Packed[]>(initialPacked)
   const [categories, setCategories] = useState<CategoryWithItems[]>(categoriesWithItems)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
+  const [query, setQuery] = useState('')
   const supabase = createClient()
 
   // Sync when server pushes new RSC payload after revalidatePath
@@ -81,6 +83,23 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
     }).length, 0)
   const pct = totalItems > 0 ? Math.round((totalPacked / totalItems) * 100) : 0
 
+  // ── Search filter ──────────────────────────────────────────────────────────
+  const q = query.trim().toLowerCase()
+  const filteredCategories = useMemo(() => {
+    if (!q) return categories
+    return categories
+      .map(c => ({
+        ...c,
+        items: c.items.filter(i =>
+          i.name.toLowerCase().includes(q) ||
+          (i.note?.toLowerCase().includes(q) ?? false)
+        ),
+      }))
+      .filter(c => c.items.length > 0)
+  }, [categories, q])
+
+  const matchCount = q ? filteredCategories.reduce((s, c) => s + c.items.length, 0) : 0
+
   return (
     <>
       <div className="px-4 pt-4 pb-6 flex flex-col gap-3">
@@ -94,7 +113,35 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
           </div>
           <p className="font-mono text-xs text-text-muted mt-1">{pct}% packed</p>
         </div>
-        {categories.map(cat => (
+
+        {/* Search bar */}
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search items…"
+            aria-label="Search packing items"
+            className="w-full h-10 bg-surface border border-border rounded-xl pl-9 pr-9 text-sm text-text font-body outline-none focus:border-accent/60 transition-colors placeholder:text-text-dim"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-text-dim hover:text-text transition-colors"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+        {q && (
+          <p className="font-mono text-[11px] text-text-muted -mt-1">
+            {matchCount} {matchCount === 1 ? 'match' : 'matches'} for &ldquo;{query.trim()}&rdquo;
+          </p>
+        )}
+
+        {filteredCategories.map(cat => (
           <CategoryCard
             key={cat.id}
             category={cat}
@@ -103,8 +150,23 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
             onToggle={handleToggle}
             onEdit={item => setEditingItem(item)}
             onDelete={handleDelete}
+            forceOpen={!!q}
+            hideAddForm={!!q}
           />
         ))}
+
+        {q && filteredCategories.length === 0 && (
+          <div className="text-center py-10 flex flex-col items-center gap-2">
+            <Search size={22} className="text-text-dim" />
+            <p className="font-mono text-xs text-text-muted">No items match &ldquo;{query.trim()}&rdquo;</p>
+            <button
+              onClick={() => setQuery('')}
+              className="font-mono text-[11px] text-accent hover:underline"
+            >
+              Clear search
+            </button>
+          </div>
+        )}
       </div>
       <EditItemSheet
         item={editingItem}

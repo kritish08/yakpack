@@ -13,6 +13,8 @@ interface CategoryCardProps {
   onToggle: (itemId: string, userKey: string, isPacked: boolean) => void
   onEdit?: (item: Item) => void
   onDelete?: (itemId: string) => void
+  forceOpen?: boolean       // override collapse while searching
+  hideAddForm?: boolean     // hide the per-category add control while searching
 }
 
 function countPacked(items: CategoryWithItems['items'], packed: Packed[], profileRole: string) {
@@ -28,8 +30,9 @@ function countPacked(items: CategoryWithItems['items'], packed: Packed[], profil
 const inputClass =
   'bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent transition-colors'
 
-export default function CategoryCard({ category, packed, profile, onToggle, onEdit, onDelete }: CategoryCardProps) {
+export default function CategoryCard({ category, packed, profile, onToggle, onEdit, onDelete, forceOpen, hideAddForm }: CategoryCardProps) {
   const [open, setOpen] = useState(true)
+  const isOpen = forceOpen || open
   const [showAddForm, setShowAddForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newQty, setNewQty] = useState('')
@@ -66,7 +69,8 @@ export default function CategoryCard({ category, packed, profile, onToggle, onEd
     <div className="border border-border rounded-2xl overflow-hidden bg-surface">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2/50 transition-colors"
+        disabled={forceOpen}
+        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2/50 transition-colors disabled:hover:bg-transparent"
       >
         {category.icon && <span className="text-xl">{category.icon}</span>}
         <span className="flex-1 text-left font-display font-bold text-sm uppercase tracking-tight text-text">
@@ -75,14 +79,14 @@ export default function CategoryCard({ category, packed, profile, onToggle, onEd
         <span className={`font-mono text-xs tabular-nums ${allDone ? 'text-accent-2' : 'text-text-muted'}`}>
           {done}/{total}
         </span>
-        <ChevronDown size={16} className={`text-text-muted transition-transform duration-200 ${open ? 'rotate-0' : '-rotate-90'}`} />
+        <ChevronDown size={16} className={`text-text-muted transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'} ${forceOpen ? 'opacity-30' : ''}`} />
       </button>
 
       <div className="h-0.5 bg-border mx-4">
         <div className="h-full bg-accent-2 transition-all duration-300 rounded-full" style={{ width: `${progress}%` }} />
       </div>
 
-      {open && (
+      {isOpen && (
         <>
           {category.items.length > 0 ? (
             <div className="divide-y divide-border/50">
@@ -94,7 +98,7 @@ export default function CategoryCard({ category, packed, profile, onToggle, onEd
             <p className="px-4 py-3 font-mono text-xs text-text-dim">No items</p>
           )}
 
-          {showAddForm ? (
+          {hideAddForm ? null : showAddForm ? (
             <form onSubmit={handleAddSubmit} className="border-t border-border/50 px-4 py-3 flex flex-col gap-2">
               <input
                 type="text"
