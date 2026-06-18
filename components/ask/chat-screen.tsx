@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { Send, Sparkles } from 'lucide-react'
+import { Send, Sparkles, Bot } from 'lucide-react'
 import ConfirmAddSheet from './confirm-add-sheet'
 import { addItem } from '@/app/actions/items'
 
@@ -24,8 +24,16 @@ interface AddItemsInput {
   reason: string
 }
 
+const QUICK_PROMPTS = [
+  "What should I carry today?",
+  "Check my packing gaps",
+  "What's the weather at Chandratal?",
+  "Tell me about altitude sickness",
+]
+
 export default function ChatScreen({ briefing, defaultCategoryId }: ChatScreenProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [input, setInput] = useState('')
 
   const { messages, sendMessage, addToolResult, status } = useChat({
@@ -38,12 +46,13 @@ export default function ChatScreen({ briefing, defaultCategoryId }: ChatScreenPr
   })
 
   const isLoading = status === 'streaming' || status === 'submitted'
+  const isEmpty = messages.length === 0
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Find pending addItems tool call (no execute on server → state stays 'input-available')
+  // Find pending addItems tool call
   const pendingAddPart = (messages as any[])
     .flatMap((m: any) => m.parts ?? [])
     .find((p: any) =>
@@ -95,105 +104,129 @@ export default function ChatScreen({ briefing, defaultCategoryId }: ChatScreenPr
     sendMessage({ text })
   }
 
-  const QUICK_PROMPTS = [
-    "What should I carry today?",
-    "Am I missing anything critical?",
-    "What's the weather like at Chandratal?",
-    "Tell me about altitude sickness",
-  ]
+  function sendQuick(text: string) {
+    sendMessage({ text })
+    inputRef.current?.focus()
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 flex flex-col gap-3">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center pt-8 pb-4 gap-3">
-            <span className="text-5xl">🐂</span>
-            <p className="font-display font-bold text-lg uppercase tracking-tight text-text">Ask Pemba</p>
-            <p className="font-mono text-xs text-text-muted text-center leading-relaxed max-w-xs">
-              Your AI yak for Spiti. Ask about weather, what to pack, altitude tips, or anything trip-related.
-            </p>
-            <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
-              {QUICK_PROMPTS.map(p => (
-                <button
-                  key={p}
-                  onClick={() => { setInput(''); sendMessage({ text: p }) }}
-                  className="text-left px-3 py-2.5 rounded-xl bg-surface border border-border text-text-muted font-body text-sm hover:border-accent/40 hover:text-text transition-colors"
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+    <div className="fixed inset-0 flex flex-col bg-bg" style={{ paddingBottom: '56px', paddingTop: '53px' }}>
 
-        {(messages as any[]).map((m: any) => (
-          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} gap-2`}>
-            {m.role === 'assistant' && (
-              <span className="text-xl shrink-0 mt-1">🐂</span>
-            )}
-            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-              m.role === 'user'
-                ? 'bg-accent text-bg rounded-br-sm'
-                : 'bg-surface border border-border rounded-bl-sm'
-            }`}>
-              {(m.parts ?? []).map((part: any, i: number) => {
-                if (part.type === 'text') {
-                  return (
-                    <p key={i} className={`font-body text-sm leading-relaxed whitespace-pre-wrap ${m.role === 'user' ? 'text-bg' : 'text-text'}`}>
-                      {part.text}
-                    </p>
-                  )
-                }
-                if (part.type === 'tool-invocation') {
-                  const inv = part.toolInvocation
-                  if (inv?.toolName === 'addItems') return null // handled by confirm sheet
-                  if (inv?.state === 'input-streaming' || inv?.state === 'input-available') {
+      {/* ── Empty state ── */}
+      {isEmpty && (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5">
+          <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-3xl">
+            🐂
+          </div>
+          <div className="text-center">
+            <p className="font-display font-bold text-base uppercase tracking-tight text-text">Ask Pemba</p>
+            <p className="font-mono text-xs text-text-muted mt-1 leading-relaxed max-w-[260px]">
+              Weather · packing gaps · altitude tips · anything about the trip
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
+            {QUICK_PROMPTS.map(p => (
+              <button
+                key={p}
+                onClick={() => sendQuick(p)}
+                className="text-left px-3 py-2.5 rounded-xl bg-surface border border-border text-text-muted font-body text-xs leading-snug hover:border-accent/40 hover:text-text active:scale-95 transition-all"
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Message list ── */}
+      {!isEmpty && (
+        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+          {(messages as any[]).map((m: any) => (
+            <div key={m.id} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+
+              {/* Pemba avatar */}
+              {m.role === 'assistant' && (
+                <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">
+                  🐂
+                </div>
+              )}
+
+              <div className={`max-w-[78%] flex flex-col gap-1 ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                {(m.parts ?? []).map((part: any, i: number) => {
+                  if (part.type === 'text' && part.text) {
                     return (
-                      <p key={i} className="font-mono text-xs text-text-muted italic">
-                        Checking {(inv.toolName as string).replace(/([A-Z])/g, ' $1').toLowerCase()}…
-                      </p>
+                      <div
+                        key={i}
+                        className={`px-3.5 py-2.5 rounded-2xl text-sm font-body leading-relaxed whitespace-pre-wrap ${
+                          m.role === 'user'
+                            ? 'bg-accent text-bg rounded-br-sm'
+                            : 'bg-surface border border-border rounded-bl-sm text-text'
+                        }`}
+                      >
+                        {part.text}
+                      </div>
                     )
                   }
+                  if (part.type === 'tool-invocation') {
+                    const inv = part.toolInvocation
+                    if (inv?.toolName === 'addItems') return null
+                    if (inv?.state === 'input-streaming' || inv?.state === 'input-available') {
+                      return (
+                        <div key={i} className="px-3.5 py-2 rounded-2xl rounded-bl-sm bg-surface border border-border">
+                          <p className="font-mono text-[11px] text-text-muted">
+                            Looking up {(inv.toolName as string).replace(/([A-Z])/g, ' $1').trim().toLowerCase()}…
+                          </p>
+                        </div>
+                      )
+                    }
+                    return null
+                  }
                   return null
-                }
-                return null
-              })}
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {isLoading && (messages as any[])[(messages as any[]).length - 1]?.role === 'user' && (
-          <div className="flex justify-start gap-2">
-            <span className="text-xl">🐂</span>
-            <div className="bg-surface border border-border rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1.5 items-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce [animation-delay:300ms]" />
+          {/* Typing indicator */}
+          {isLoading && (messages as any[]).at(-1)?.role === 'user' && (
+            <div className="flex gap-2.5 justify-start">
+              <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">
+                🐂
+              </div>
+              <div className="px-3.5 py-3 rounded-2xl rounded-bl-sm bg-surface border border-border flex gap-1.5 items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:0ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:120ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:240ms]" />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div ref={bottomRef} />
-      </div>
+          <div ref={bottomRef} className="h-px" />
+        </div>
+      )}
 
-      {/* Input */}
-      <div className="px-4 pb-20 pt-2 border-t border-border/50">
-        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+      {/* ── Input bar — pinned above bottom nav ── */}
+      <div className="absolute bottom-0 inset-x-0 bg-bg/95 backdrop-blur-sm border-t border-border px-3 py-2.5">
+        <form onSubmit={handleSubmit} className="flex gap-2 items-center">
           <input
+            ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Ask Pemba anything…"
             disabled={isLoading}
-            className="flex-1 bg-surface-2 border border-border rounded-xl px-4 py-3 text-sm text-text font-body outline-none focus:border-accent transition-colors placeholder:text-text-dim disabled:opacity-50"
+            autoComplete="off"
+            className="flex-1 h-10 bg-surface border border-border rounded-xl px-3.5 text-sm text-text font-body outline-none focus:border-accent/60 transition-colors placeholder:text-text-dim disabled:opacity-40"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="w-11 h-11 rounded-xl bg-accent text-bg flex items-center justify-center disabled:opacity-40 transition-opacity shrink-0"
+            className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center disabled:opacity-35 active:scale-90 transition-all shrink-0"
             aria-label="Send"
           >
-            {isLoading ? <Sparkles size={16} className="animate-pulse" /> : <Send size={16} />}
+            {isLoading
+              ? <Sparkles size={15} className="text-bg animate-pulse" />
+              : <Send size={15} className="text-bg" />
+            }
           </button>
         </form>
       </div>

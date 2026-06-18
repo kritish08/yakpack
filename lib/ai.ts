@@ -25,5 +25,8 @@ export function getAzureModel() {
     apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? '2024-10-21',
   })
 
-  return azure(process.env.AZURE_OPENAI_DEPLOYMENT ?? 'gpt-4o')
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT ?? 'gpt-4o'
+  // gpt-5.x models use the Responses API (/v1/responses), not Chat Completions
+  const useResponses = process.env.AZURE_USE_RESPONSES_API === 'true'
+  return useResponses ? azure.responses(deployment) : azure(deployment)
 }
