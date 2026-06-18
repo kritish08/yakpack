@@ -19,13 +19,30 @@ export async function POST(req: Request) {
 
   const { messages } = await req.json()
 
+  // Drop any tool parts that never reached a terminal state (input-streaming /
+  // input-available / approval-*). These appear when a confirmation sheet was
+  // dismissed by closing the app, or in conversations saved by older builds —
+  // convertToModelMessages() throws on unresolved tool calls otherwise.
+  const TERMINAL = new Set(['output-available', 'output-error', 'output-denied'])
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const sanitized = (messages as any[]).map((m: any) => {
+    if (!Array.isArray(m.parts)) return m
+    const parts = m.parts.filter((p: any) => {
+      const isTool = typeof p?.type === 'string' && (p.type.startsWith('tool-') || p.type === 'dynamic-tool')
+      if (!isTool) return true
+      return TERMINAL.has(p.state)
+    })
+    return { ...m, parts }
+  }).filter((m: any) => (m.parts?.length ?? 0) > 0)
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
   const result = streamText({
     onError: (err) => {
       console.error('[chat] streamText error:', JSON.stringify(err, null, 2))
     },
     model: getAzureModel(),
     system: PEMBA_SYSTEM,
-    messages: await convertToModelMessages(messages),
+    messages: await convertToModelMessages(sanitized),
     stopWhen: stepCountIs(5),
     tools: {
 

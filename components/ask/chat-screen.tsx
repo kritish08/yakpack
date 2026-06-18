@@ -2,9 +2,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
 import { Send, Sparkles } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -33,7 +33,17 @@ interface AddItemsInput {
   reason: string
 }
 
-const CLIENT_TOOLS = ['addItems', 'updateItem', 'deleteItem', 'markAsBought']
+// Tools that require a client-side confirmation sheet before they take effect.
+const CLIENT_TOOLS = ['addItems', 'updateItem', 'deleteItem', 'markAsBought'] as const
+
+// Human-readable label for read-tool progress chips.
+const READ_TOOL_LABEL: Record<string, string> = {
+  getCurrentLeg:   'checking today’s leg',
+  getItinerary:    'reading the itinerary',
+  getWeather:      'fetching weather',
+  getCategories:   'loading categories',
+  getPackingState: 'reviewing your packing list',
+}
 
 const QUICK_PROMPTS = [
   "What should I carry today?",
@@ -44,6 +54,13 @@ const QUICK_PROMPTS = [
 
 const INPUT_BAR_H = 60
 const NAV_H       = 56
+
+// In AI SDK v6, tool parts are typed `tool-<name>`; the tool name is the suffix.
+function toolNameOf(part: any): string | null {
+  if (typeof part?.type !== 'string') return null
+  if (part.type === 'dynamic-tool') return part.toolName ?? null
+  return part.type.startsWith('tool-') ? part.type.slice('tool-'.length) : null
+}
 
 // Markdown component factories — different colours for user vs assistant bubbles
 function mkComponents(isUser: boolean) {
@@ -57,7 +74,6 @@ function mkComponents(isUser: boolean) {
     li:     ({ children }: any) => <li className="leading-relaxed">{children}</li>,
     code:   ({ children }: any) => <code className={`font-mono text-[11px] px-1 py-0.5 rounded ${baseCode}`}>{children}</code>,
     hr:     () => <hr className="border-border/40 my-2" />,
-    // suppress raw anchor rendering
     a:      ({ children, href }: any) => <span className="underline decoration-dotted">{children ?? href}</span>,
   }
 }
@@ -67,7 +83,6 @@ export default function ChatScreen({
   defaultCategoryId,
   initialMessages,
   onSaveMessages,
-  onShowHistory,
 }: ChatScreenProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
@@ -83,9 +98,12 @@ export default function ChatScreen({
   const { messages, sendMessage, addToolResult, status } = useChat({
     transport: new DefaultChatTransport({ api: '/api/ai/chat' }),
     messages: seedMessages,
+    // After the client resolves a confirmation tool, automatically send the
+    // result back so Pemba can acknowledge and continue the conversation.
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
   })
 
-  // Save conversation to parent whenever messages settle (status becomes idle)
+  // Save conversation to parent whenever messages settle
   const prevStatus = useRef(status)
   useEffect(() => {
     const wasActive = prevStatus.current === 'streaming' || prevStatus.current === 'submitted'
@@ -97,37 +115,39 @@ export default function ChatScreen({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
-  const isLoading  = status === 'streaming' || status === 'submitted'
+  const isLoading   = status === 'streaming' || status === 'submitted'
   const isStreaming = status === 'streaming'
-  const isEmpty    = messages.length === 0
+  const isEmpty     = messages.length === 0
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, status])
 
-  // Find the first pending client-side tool call
-  const pendingToolPart = (messages as any[])
-    .flatMap((m: any) => m.parts ?? [])
-    .find((p: any) =>
-      p.type === 'tool-invocation' &&
-      CLIENT_TOOLS.includes(p.toolInvocation?.toolName) &&
-      p.toolInvocation?.state === 'input-available'
-    )
-  const pendingToolName    = pendingToolPart?.toolInvocation?.toolName as string | undefined
-  const pendingToolInput   = pendingToolPart?.toolInvocation?.input   ?? null
-  const pendingToolCallId  = pendingToolPart?.toolInvocation?.toolCallId ?? null
+  // ── Find the first pending client-side tool call (state: input-available) ──
+  const pending = useMemo(() => {
+    for (const m of messages as any[]) {
+      if (m.role !== 'assistant') continue
+      for (const part of m.parts ?? []) {
+        const name = toolNameOf(part)
+        if (name && (CLIENT_TOOLS as readonly string[]).includes(name) && part.state === 'input-available') {
+          return { name, input: part.input, toolCallId: part.toolCallId }
+        }
+      }
+    }
+    return null
+  }, [messages])
 
   async function resolveToolCall(output: object) {
-    if (!pendingToolPart) return
+    if (!pending) return
     await (addToolResult as any)({
-      tool:        pendingToolName,
-      toolCallId:  pendingToolCallId,
+      tool:       pending.name,
+      toolCallId: pending.toolCallId,
       output,
     })
   }
 
   // addItems confirmation
-  const addItemsInput = pendingToolName === 'addItems' ? pendingToolInput as AddItemsInput : null
+  const addItemsInput = pending?.name === 'addItems' ? pending.input as AddItemsInput : null
 
   async function handleConfirmAdd(items: AddItemsInput['items']) {
     let added = 0
@@ -144,12 +164,12 @@ export default function ChatScreen({
         added++
       } catch (e) { console.error(e) }
     }
-    await resolveToolCall({ success: true, added, message: `Added ${added} item${added !== 1 ? 's' : ''}.` })
+    await resolveToolCall({ success: true, added, message: `Added ${added} item${added !== 1 ? 's' : ''} to the list.` })
   }
 
   // updateItem / deleteItem / markAsBought confirmation
-  const actionType  = (pendingToolName && pendingToolName !== 'addItems') ? pendingToolName as ActionType : null
-  const actionInput = actionType ? pendingToolInput as UpdateItemInput | DeleteItemInput | MarkAsBoughtInput : null
+  const actionType  = (pending && pending.name !== 'addItems') ? pending.name as ActionType : null
+  const actionInput = actionType ? pending!.input as UpdateItemInput | DeleteItemInput | MarkAsBoughtInput : null
 
   async function handleConfirmAction() {
     if (!actionType || !actionInput) return
@@ -212,12 +232,12 @@ export default function ChatScreen({
         ) : (
           <div className="flex flex-col gap-3">
             {(messages as any[]).map((m: any, msgIdx: number) => {
-              const isLastMsg     = msgIdx === messages.length - 1
-              const textParts     = (m.parts ?? []).filter((p: any) => p.type === 'text' && p.text)
-              const lastTextPart  = textParts[textParts.length - 1]
+              const isLastMsg    = msgIdx === messages.length - 1
+              const textParts    = (m.parts ?? []).filter((p: any) => p.type === 'text' && p.text)
+              const lastTextPart = textParts[textParts.length - 1]
 
               return (
-                <div key={m.id} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div key={m.id ?? msgIdx} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   {m.role === 'assistant' && (
                     <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">
                       🐂
@@ -225,9 +245,10 @@ export default function ChatScreen({
                   )}
                   <div className={`max-w-[78%] flex flex-col gap-1 ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                     {(m.parts ?? []).map((part: any, i: number) => {
+                      // ── Text ──
                       if (part.type === 'text' && part.text) {
-                        const isUser       = m.role === 'user'
-                        const showCursor   = isStreaming && isLastMsg && part === lastTextPart && !isUser
+                        const isUser     = m.role === 'user'
+                        const showCursor = isStreaming && isLastMsg && part === lastTextPart && !isUser
                         return (
                           <div
                             key={i}
@@ -247,19 +268,23 @@ export default function ChatScreen({
                         )
                       }
 
-                      if (part.type === 'tool-invocation') {
-                        const inv = part.toolInvocation
-                        // Hide client-confirmed tools from the bubble stream
-                        if (CLIENT_TOOLS.includes(inv?.toolName)) return null
-                        if (inv?.state === 'input-streaming' || inv?.state === 'input-available') {
+                      // ── Tool parts (v6: type `tool-<name>`) ──
+                      const toolName = toolNameOf(part)
+                      if (toolName) {
+                        // Client-confirmed tools are surfaced via the sheet, not the stream.
+                        if ((CLIENT_TOOLS as readonly string[]).includes(toolName)) return null
+                        // Read tools: show a small progress chip while running.
+                        if (part.state === 'input-streaming' || part.state === 'input-available') {
                           return (
                             <div key={i} className="px-3.5 py-2 rounded-2xl rounded-bl-sm bg-surface border border-border">
-                              <p className="font-mono text-[11px] text-text-muted">
-                                Checking {(inv.toolName as string).replace(/([A-Z])/g, ' $1').trim().toLowerCase()}…
+                              <p className="font-mono text-[11px] text-text-muted flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-pulse" />
+                                {READ_TOOL_LABEL[toolName] ?? `running ${toolName}`}…
                               </p>
                             </div>
                           )
                         }
+                        return null
                       }
                       return null
                     })}
@@ -268,12 +293,10 @@ export default function ChatScreen({
               )
             })}
 
-            {/* Typing dots — waiting for first token OR streaming with only tool calls so far */}
+            {/* Typing dots — loading and no visible assistant text yet */}
             {(() => {
               if (!isLoading) return null
               const lastMsg = (messages as any[]).at(-1)
-              // Show dots when: last message is from user (submitted, not yet responded)
-              // OR last message is assistant with no visible text yet (tool calls in flight)
               const noVisibleText = !lastMsg || lastMsg.role === 'user' ||
                 !(lastMsg.parts ?? []).some((p: any) => p.type === 'text' && p.text?.trim())
               if (!noVisibleText) return null
