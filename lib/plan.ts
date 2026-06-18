@@ -38,3 +38,4 @@ export async function getPlanData() {
 
   return { legs, trip, profile, today }
 }
+

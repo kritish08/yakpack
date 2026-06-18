@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { Leg, Trip, Profile, LegWeather } from '@/lib/plan'
+import { amsRisk } from '@/lib/ams'
 import DayCard from './day-card'
 
 interface PlanScreenProps {
@@ -137,6 +138,7 @@ export default function PlanScreen({ legs, trip, profile, today, weatherMap, tod
               weather={weatherMap?.[leg.day] ?? null}
               insightNode={isToday ? todayInsightNode : undefined}
               aiEnabled={aiEnabled}
+              ams={amsRisk(legs, leg.day)}
             />
           )
         })}

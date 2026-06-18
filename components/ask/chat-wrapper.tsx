@@ -135,9 +135,10 @@ function HistoryPanel({ conversations, currentId, onLoad, onNew, onDelete, onClo
 interface ChatWrapperProps {
   briefing:          string | null
   defaultCategoryId: number
+  initialInput?:     string
 }
 
-export default function ChatWrapper({ briefing, defaultCategoryId }: ChatWrapperProps) {
+export default function ChatWrapper({ briefing, defaultCategoryId, initialInput }: ChatWrapperProps) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentId,     setCurrentId]     = useState(() => crypto.randomUUID())
   const [loadedMessages, setLoadedMessages] = useState<StoredMessage[] | null>(null)
@@ -222,6 +223,7 @@ export default function ChatWrapper({ briefing, defaultCategoryId }: ChatWrapper
         key={currentId}
         briefing={isLoaded ? null : briefing}
         initialMessages={loadedMessages ?? undefined}
+        initialInput={isLoaded ? undefined : initialInput}
         defaultCategoryId={defaultCategoryId}
         onSaveMessages={handleSaveMessages}
         onShowHistory={() => setShowHistory(true)}

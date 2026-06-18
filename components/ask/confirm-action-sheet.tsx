@@ -74,7 +74,7 @@ export default function ConfirmActionSheet({ type, input, onConfirm, onDismiss }
             {type === 'updateItem'    && <Pencil      size={16} className="text-accent"   />}
             {type === 'markAsBought'  && <ShoppingBag size={16} className="text-accent-2" />}
             <h2 className="font-display font-bold text-sm uppercase tracking-tight text-text">
-              {type === 'deleteItem' ? 'Delete item?' : type === 'markAsBought' ? 'Mark as bought?' : 'Update item?'}
+              {type === 'deleteItem' ? 'Delete everywhere?' : type === 'markAsBought' ? 'Mark as bought?' : 'Update item?'}
             </h2>
           </div>
           <button onClick={onDismiss} className="p-1.5 text-text-muted hover:text-text transition-colors">
@@ -120,11 +120,14 @@ export default function ConfirmActionSheet({ type, input, onConfirm, onDismiss }
         {type === 'deleteItem' && (() => {
           const d = input as DeleteItemInput
           return (
-            <div className="mb-4">
+            <div className="mb-4 space-y-2">
               <div className="bg-accent-3/8 rounded-xl px-4 py-3 border border-accent-3/20">
                 <p className="font-body text-sm text-text font-medium">{d.name}</p>
                 <p className="font-mono text-xs text-text-muted mt-1">{d.reason}</p>
               </div>
+              <p className="font-mono text-[11px] text-accent-3 leading-relaxed">
+                This permanently removes the item from your whole pack — Pack, Summary and shopping — for everyone. This can&apos;t be undone. To just stop buying it, cancel and ask Pemba to move it off the shopping list instead.
+              </p>
             </div>
           )
         })()}

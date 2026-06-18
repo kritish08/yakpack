@@ -18,6 +18,7 @@ interface ChatScreenProps {
   briefing:          string | null
   defaultCategoryId: number
   initialMessages?:  StoredMessage[]
+  initialInput?:     string
   onSaveMessages?:   (messages: StoredMessage[]) => void
   onShowHistory?:    () => void
 }
@@ -82,11 +83,12 @@ export default function ChatScreen({
   briefing,
   defaultCategoryId,
   initialMessages,
+  initialInput,
   onSaveMessages,
 }: ChatScreenProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(initialInput ?? '')
 
   // Build seed messages: loaded history takes precedence over fresh briefing
   const seedMessages: any[] = initialMessages
@@ -120,7 +122,7 @@ export default function ChatScreen({
   const isEmpty     = messages.length === 0
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, status])
 
   // ── Find the first pending client-side tool call (state: input-available) ──
@@ -204,7 +206,7 @@ export default function ChatScreen({
       {/* ── Messages ── */}
       <div
         className="flex-1 flex flex-col px-4 pt-4"
-        style={{ paddingBottom: NAV_H + INPUT_BAR_H + 16 }}
+        style={{ paddingBottom: NAV_H + INPUT_BAR_H + 32 }}
       >
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-5 py-8">
@@ -231,84 +233,129 @@ export default function ChatScreen({
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {(messages as any[]).map((m: any, msgIdx: number) => {
-              const isLastMsg    = msgIdx === messages.length - 1
-              const textParts    = (m.parts ?? []).filter((p: any) => p.type === 'text' && p.text)
-              const lastTextPart = textParts[textParts.length - 1]
+            {(() => {
+              const msgs = messages as any[]
+              const lastMsg = msgs.at(-1)
+
+              // Does the in-flight assistant turn already own a visible bubble?
+              // True when the last message is an assistant with renderable text
+              // or a visible read-tool chip — in that case its dots live inside it.
+              const hasRenderable = (m: any) => {
+                const parts = m?.parts ?? []
+                const hasText = parts.some((p: any) => p.type === 'text' && p.text?.trim())
+                const hasReadChip = parts.some((p: any) => {
+                  const name = toolNameOf(p)
+                  return name
+                    && !(CLIENT_TOOLS as readonly string[]).includes(name)
+                    && (p.state === 'input-streaming' || p.state === 'input-available')
+                })
+                return hasText || hasReadChip
+              }
+
+              // The active assistant turn is "bubble-less" when loading and the
+              // last message is a user turn, or an assistant turn that currently
+              // renders nothing (all client-tool parts → null). In that case we
+              // emit a single standalone assistant bubble holding the dots.
+              const needsStandaloneDots =
+                isLoading && (!lastMsg || lastMsg.role === 'user' || !hasRenderable(lastMsg))
 
               return (
-                <div key={m.id ?? msgIdx} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {m.role === 'assistant' && (
-                    <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">
-                      🐂
+                <>
+                  {msgs.map((m: any, msgIdx: number) => {
+                    const isLastMsg    = msgIdx === messages.length - 1
+                    const textParts    = (m.parts ?? []).filter((p: any) => p.type === 'text' && p.text)
+                    const lastTextPart = textParts[textParts.length - 1]
+
+                    // 1a/1d: never render a lone assistant avatar+empty bubble.
+                    // Skip any assistant row with zero renderable content — its
+                    // dots (if it's the active turn) come from the standalone block.
+                    if (m.role === 'assistant' && !hasRenderable(m)) return null
+
+                    // 1b: this assistant turn is active + visible → show dots
+                    // inside its own bubble until the first text token arrives.
+                    const showInlineDots =
+                      m.role === 'assistant' && isLastMsg && isLoading && textParts.length === 0
+
+                    return (
+                      <div key={m.id ?? msgIdx} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        {m.role === 'assistant' && (
+                          <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">
+                            🐂
+                          </div>
+                        )}
+                        <div className={`max-w-[78%] flex flex-col gap-1 ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                          {(m.parts ?? []).map((part: any, i: number) => {
+                            // ── Text ──
+                            if (part.type === 'text' && part.text) {
+                              const isUser     = m.role === 'user'
+                              const showCursor = isStreaming && isLastMsg && part === lastTextPart && !isUser
+                              return (
+                                <div
+                                  key={i}
+                                  className={`px-3.5 py-2.5 rounded-2xl text-sm font-body leading-relaxed ${
+                                    isUser
+                                      ? 'bg-accent text-bg rounded-br-sm'
+                                      : 'bg-surface border border-border rounded-bl-sm text-text'
+                                  }`}
+                                >
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={mkComponents(isUser)}>
+                                    {part.text}
+                                  </ReactMarkdown>
+                                  {showCursor && (
+                                    <span className="inline-block w-0.5 h-[1em] bg-accent/70 ml-0.5 align-middle animate-[blink_1s_step-end_infinite]" />
+                                  )}
+                                </div>
+                              )
+                            }
+
+                            // ── Tool parts (v6: type `tool-<name>`) ──
+                            const toolName = toolNameOf(part)
+                            if (toolName) {
+                              // Client-confirmed tools are surfaced via the sheet, not the stream.
+                              if ((CLIENT_TOOLS as readonly string[]).includes(toolName)) return null
+                              // Read tools: show a small progress chip while running.
+                              if (part.state === 'input-streaming' || part.state === 'input-available') {
+                                return (
+                                  <div key={i} className="px-3.5 py-2 rounded-2xl rounded-bl-sm bg-surface border border-border">
+                                    <p className="font-mono text-[11px] text-text-muted flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-pulse" />
+                                      {READ_TOOL_LABEL[toolName] ?? `running ${toolName}`}…
+                                    </p>
+                                  </div>
+                                )
+                              }
+                              return null
+                            }
+                            return null
+                          })}
+
+                          {/* 1b: dots inside this same bubble (read-chip visible
+                              but no text yet) → one avatar, dots become text. */}
+                          {showInlineDots && (
+                            <div className="px-3.5 py-3 rounded-2xl rounded-bl-sm bg-surface border border-border flex gap-1.5 items-center">
+                              <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:0ms]" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:120ms]" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:240ms]" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* 1b: single standalone assistant bubble with dots when the
+                      active turn has no visible bubble of its own yet. */}
+                  {needsStandaloneDots && (
+                    <div className="flex gap-2.5">
+                      <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">🐂</div>
+                      <div className="px-3.5 py-3 rounded-2xl rounded-bl-sm bg-surface border border-border flex gap-1.5 items-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:0ms]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:120ms]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:240ms]" />
+                      </div>
                     </div>
                   )}
-                  <div className={`max-w-[78%] flex flex-col gap-1 ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                    {(m.parts ?? []).map((part: any, i: number) => {
-                      // ── Text ──
-                      if (part.type === 'text' && part.text) {
-                        const isUser     = m.role === 'user'
-                        const showCursor = isStreaming && isLastMsg && part === lastTextPart && !isUser
-                        return (
-                          <div
-                            key={i}
-                            className={`px-3.5 py-2.5 rounded-2xl text-sm font-body leading-relaxed ${
-                              isUser
-                                ? 'bg-accent text-bg rounded-br-sm'
-                                : 'bg-surface border border-border rounded-bl-sm text-text'
-                            }`}
-                          >
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mkComponents(isUser)}>
-                              {part.text}
-                            </ReactMarkdown>
-                            {showCursor && (
-                              <span className="inline-block w-0.5 h-[1em] bg-accent/70 ml-0.5 align-middle animate-[blink_1s_step-end_infinite]" />
-                            )}
-                          </div>
-                        )
-                      }
-
-                      // ── Tool parts (v6: type `tool-<name>`) ──
-                      const toolName = toolNameOf(part)
-                      if (toolName) {
-                        // Client-confirmed tools are surfaced via the sheet, not the stream.
-                        if ((CLIENT_TOOLS as readonly string[]).includes(toolName)) return null
-                        // Read tools: show a small progress chip while running.
-                        if (part.state === 'input-streaming' || part.state === 'input-available') {
-                          return (
-                            <div key={i} className="px-3.5 py-2 rounded-2xl rounded-bl-sm bg-surface border border-border">
-                              <p className="font-mono text-[11px] text-text-muted flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-pulse" />
-                                {READ_TOOL_LABEL[toolName] ?? `running ${toolName}`}…
-                              </p>
-                            </div>
-                          )
-                        }
-                        return null
-                      }
-                      return null
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Typing dots — loading and no visible assistant text yet */}
-            {(() => {
-              if (!isLoading) return null
-              const lastMsg = (messages as any[]).at(-1)
-              const noVisibleText = !lastMsg || lastMsg.role === 'user' ||
-                !(lastMsg.parts ?? []).some((p: any) => p.type === 'text' && p.text?.trim())
-              if (!noVisibleText) return null
-              return (
-                <div className="flex gap-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">🐂</div>
-                  <div className="px-3.5 py-3 rounded-2xl rounded-bl-sm bg-surface border border-border flex gap-1.5 items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:0ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:120ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:240ms]" />
-                  </div>
-                </div>
+                </>
               )
             })()}
 

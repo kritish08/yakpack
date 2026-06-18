@@ -169,7 +169,7 @@ export async function POST(req: Request) {
 
       deleteItem: tool({
         description:
-          'Delete a packing list item permanently. Always confirm with the user BEFORE calling. Use getPackingState() to find the item ID first.',
+          "Permanently delete a packing list item EVERYWHERE — it is removed from the entire pack (Pack, Summary, and the shopping list) for both people and cannot be undone. Use ONLY when the user clearly wants the item gone entirely. Always describe exactly what will be deleted and get a strong explicit confirmation BEFORE calling. If the user only means \"remove from the shopping list\" / \"I'm not buying this\" / \"stop buying this\", do NOT use deleteItem — instead call updateItem to set status to 'standard', which keeps the item in the pack but takes it off the shopping list. Use getPackingState() to find the item ID first.",
         inputSchema: z.object({
           id:     z.string().describe('Item ID to delete'),
           name:   z.string().describe('Item name for display in confirmation'),

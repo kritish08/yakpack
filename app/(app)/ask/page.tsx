@@ -17,7 +17,12 @@ async function fetchBriefing(): Promise<string | null> {
   }
 }
 
-export default async function AskPage() {
+interface AskPageProps {
+  // Next.js 16: searchParams is async.
+  searchParams: Promise<{ day?: string }>
+}
+
+export default async function AskPage({ searchParams }: AskPageProps) {
   if (!AI_ENABLED) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-8 text-center gap-4 pb-20">
@@ -30,17 +35,30 @@ export default async function AskPage() {
     )
   }
 
+  const { day } = await searchParams
+  const dayNum = day ? Number(day) : NaN
+
   const supabase = await createClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [briefing, { data: firstCategoryRaw }] = await Promise.all([
+  const [briefing, { data: firstCategoryRaw }, legRes] = await Promise.all([
     fetchBriefing(),
     (supabase.from('categories') as any).select('id').order('sort_order').limit(1).single(),
+    Number.isInteger(dayNum)
+      ? supabase.from('itinerary').select('day, leg').eq('day', dayNum).single()
+      : Promise.resolve({ data: null }),
   ])
   const defaultCategoryId = (firstCategoryRaw as { id: number } | null)?.id ?? 1
 
+  // Deep-linked from the Plan screen (?day=<n>) — pre-fill (not auto-send) the
+  // chat input with a contextual prompt for that leg so Pemba answers specifically.
+  const leg = (legRes as { data: { day: number; leg: string } | null }).data
+  const initialInput = leg
+    ? `Tell me about Day ${leg.day} — ${leg.leg}: what should I prepare and carry?`
+    : undefined
+
   return (
     <div className="flex flex-col h-full">
-      <ChatWrapper briefing={briefing} defaultCategoryId={defaultCategoryId} />
+      <ChatWrapper briefing={briefing} defaultCategoryId={defaultCategoryId} initialInput={initialInput} />
     </div>
   )
 }

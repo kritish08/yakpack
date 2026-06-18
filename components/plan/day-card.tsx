@@ -1,5 +1,8 @@
-import type { ReactNode } from 'react'
+'use client'
+
+import { useState, type ReactNode } from 'react'
 import type { Leg, LegWeather } from '@/lib/plan'
+import type { AmsRisk } from '@/lib/ams'
 
 const networkLabel: Record<string, { label: string; cls: string }> = {
   good:   { label: '4G',        cls: 'text-accent-2 bg-accent-2/10 border-accent-2/30' },
@@ -16,6 +19,7 @@ interface DayCardProps {
   weather?:        LegWeather | null
   insightNode?:    ReactNode  // Suspense-wrapped AI insight, only for today
   aiEnabled?:      boolean
+  ams?:            AmsRisk
 }
 
 function Row({ icon, text, label, color }: { icon: string; text: string; label?: string; color?: string }) {
@@ -55,7 +59,76 @@ function WeatherBadges({ weather }: { weather: LegWeather }) {
   )
 }
 
-export default function DayCard({ leg, isToday, isPast, cardRef, weather, insightNode, aiEnabled }: DayCardProps) {
+// Lazy, on-demand Pemba insight for any non-today leg.
+function PembaTake({ day }: { day: number }) {
+  const [open, setOpen]       = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [insight, setInsight] = useState<string | null>(null)
+  const [error, setError]     = useState(false)
+
+  async function toggle() {
+    const next = !open
+    setOpen(next)
+    if (next && insight === null && !loading) {
+      setLoading(true)
+      setError(false)
+      try {
+        const res = await fetch(`/api/ai/plan-insight?day=${day}`)
+        if (!res.ok) throw new Error('failed')
+        const json = await res.json()
+        if (typeof json.insight === 'string' && json.insight.trim()) {
+          setInsight(json.insight)
+        } else {
+          setError(true)
+        }
+      } catch {
+        setError(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  return (
+    <div className="border-t border-accent/15">
+      <button
+        onClick={toggle}
+        aria-expanded={open}
+        className="w-full min-h-[44px] px-4 py-2.5 flex items-center gap-1.5 text-left bg-accent/3 active:bg-accent/8 transition-colors"
+      >
+        <span className="text-sm shrink-0">🐂</span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-text-dim">
+          Pemba&apos;s take
+        </span>
+        <span className={`font-mono text-[10px] text-text-dim ml-auto transition-transform ${open ? 'rotate-180' : ''}`}>
+          ▾
+        </span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-3 pt-0.5 bg-accent/3 flex gap-2.5 items-start">
+          <span className="w-5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            {loading && (
+              <div className="flex flex-col gap-1.5 py-1">
+                <div className="h-3 bg-border/50 rounded-full animate-pulse w-full" />
+                <div className="h-3 bg-border/50 rounded-full animate-pulse w-4/5" />
+              </div>
+            )}
+            {!loading && insight && (
+              <p className="font-body text-sm leading-relaxed text-text/80 italic">{insight}</p>
+            )}
+            {!loading && error && (
+              <p className="font-mono text-[11px] text-text-muted">Pemba&apos;s offline right now — check the day&apos;s notes above.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function DayCard({ leg, isToday, isPast, cardRef, weather, insightNode, aiEnabled, ams }: DayCardProps) {
   const net    = leg.network ? networkLabel[leg.network] : null
   const altM   = leg.altitude_m ?? 0
   const altColor = altM > 4000 ? 'text-accent-3' : altM > 3000 ? 'text-accent' : 'text-text-muted'
@@ -69,8 +142,16 @@ export default function DayCard({ leg, isToday, isPast, cardRef, weather, insigh
   const hasContent = leg.highlights || leg.warnings || leg.tip || leg.fun || leg.prep_tonight
   const hasWeather = weather && !isPast
 
-  // AMS alert: altitude gain > 500m from a previous high-altitude leg (rule-based)
-  const altAlert = altM > 4000 && !isPast
+  // AMS badge (rule-based, AI-independent). Folds in the old >4000m "High alt" badge.
+  const amsLevel = !isPast ? (ams?.level ?? 'none') : 'none'
+  const amsBadge =
+    amsLevel === 'high'
+      ? { cls: 'text-accent-3 bg-accent-3/10 border-accent-3/30', label: '⛰ AMS risk' }
+      : amsLevel === 'watch'
+      ? { cls: 'text-accent bg-accent/10 border-accent/30', label: '💧 Acclimatise' }
+      : altM > 4000 && !isPast
+      ? { cls: 'text-accent-3 bg-accent-3/10 border-accent-3/30', label: '⛰ High alt' }
+      : null
 
   return (
     <div
@@ -116,11 +197,11 @@ export default function DayCard({ leg, isToday, isPast, cardRef, weather, insigh
       </div>
 
       {/* Weather + badges row */}
-      {(net || leg.warnings || hasWeather || altAlert) && (
+      {(net || leg.warnings || hasWeather || amsBadge) && (
         <div className={`px-4 py-2 flex gap-1.5 flex-wrap border-t border-border/30 ${isToday ? 'bg-accent/5' : 'bg-surface'}`}>
-          {altAlert && (
-            <span className="font-mono text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 text-accent-3 bg-accent-3/10 border-accent-3/30">
-              ⛰ High alt
+          {amsBadge && (
+            <span className={`font-mono text-[10px] uppercase tracking-wider border rounded px-1.5 py-0.5 ${amsBadge.cls}`}>
+              {amsBadge.label}
             </span>
           )}
           {net && (
@@ -137,6 +218,16 @@ export default function DayCard({ leg, isToday, isPast, cardRef, weather, insigh
         </div>
       )}
 
+      {/* AMS note (rule-based, shown regardless of AI flag) */}
+      {amsLevel !== 'none' && ams?.note && (
+        <Row
+          icon={amsLevel === 'high' ? '⛰' : '💧'}
+          label="Altitude"
+          text={ams.note}
+          color={amsLevel === 'high' ? 'text-accent-3' : 'text-accent'}
+        />
+      )}
+
       {/* Content rows */}
       {hasContent && (
         <div className="bg-surface-2/40 divide-y divide-border/40 border-t border-border/30">
@@ -148,14 +239,15 @@ export default function DayCard({ leg, isToday, isPast, cardRef, weather, insigh
         </div>
       )}
 
-      {/* Pemba AI insight (today only, Suspense-streamed from parent) */}
+      {/* Pemba AI insight — today eager (server-streamed), other days lazy on tap */}
       {isToday && insightNode}
+      {aiEnabled && !isToday && !isPast && <PembaTake day={leg.day} />}
 
-      {/* Ask Pemba footer (upcoming days only) */}
-      {!isPast && aiEnabled && !isToday && (
-        <div className={`px-4 py-2 border-t border-border/20 ${isToday ? 'bg-accent/5' : 'bg-surface'}`}>
+      {/* Context-aware Ask Pemba deep-link (all non-past days) */}
+      {!isPast && aiEnabled && (
+        <div className={`px-4 py-2.5 min-h-[44px] flex items-center border-t border-border/20 ${isToday ? 'bg-accent/5' : 'bg-surface'}`}>
           <a
-            href={`/ask`}
+            href={`/ask?day=${leg.day}`}
             className="font-mono text-[10px] text-text-dim hover:text-accent transition-colors flex items-center gap-1"
           >
             🐂 Ask Pemba about this day →

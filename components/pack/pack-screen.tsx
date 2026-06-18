@@ -54,7 +54,7 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
   }, [supabase])
 
   const handleDelete = useCallback(async (itemId: string) => {
-    const ok = window.confirm('Delete this item? This cannot be undone.')
+    const ok = window.confirm('Delete from your whole pack list? This removes it everywhere (Pack, Summary, and shopping list). This cannot be undone.')
     if (!ok) return
     setCategories(prev => prev.map(c => ({ ...c, items: c.items.filter(i => i.id !== itemId) })))
     setPacked(prev => prev.filter(p => p.item_id !== itemId))

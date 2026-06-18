@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Check, Pencil, Trash2, X, Sparkles } from 'lucide-react'
+import { Plus, Check, Pencil, Trash2, Ban, X, Sparkles } from 'lucide-react'
 import type { CategoryWithToBuy, Item, Packed, Profile, Category, Trip } from '@/lib/tobuy'
 import { overallProgress, personProgress, categoryProgress } from '@/lib/progress'
-import { addItem, updateItem, deleteItem } from '@/app/actions/items'
+import { addItem, updateItem, removeFromShopping } from '@/app/actions/items'
 import { addCategory, updateCategory, deleteCategory } from '@/app/actions/categories'
 
 // ── Chips ──────────────────────────────────────────────────────────────────────
@@ -118,6 +118,11 @@ export default function SummaryScreen({
     .map(cat => ({ ...cat, items: toBuyItems.filter(i => i.category_id === cat.id) }))
     .filter(cat => cat.items.length > 0)
 
+  // Map category id → name for the "in Pack · {category}" row caption
+  const catNameById = new Map<number, string>(
+    localCategories.map(c => [c.id as number, c.name])
+  )
+
   const partnerRole = profile.role === 'kritish' ? 'partner' : 'kritish'
   const myLabel     = profile.display_name || (profile.role === 'kritish' ? 'Kritish' : 'Gitansh')
   const partLabel   = profile.role === 'kritish' ? 'Gitansh' : 'Kritish'
@@ -214,9 +219,10 @@ export default function SummaryScreen({
     })
   }
 
-  function handleDelete(item: Item) {
+  // "Not buying / already have" — leaves the shopping list but stays in Pack.
+  function handleRemoveFromShopping(item: Item) {
     setToBuyItems(prev => prev.filter(i => i.id !== item.id))
-    deleteItem(item.id).catch(() => {
+    removeFromShopping(item.id).catch(() => {
       setToBuyItems(prev => [...prev, item])
     })
   }
@@ -326,22 +332,27 @@ export default function SummaryScreen({
       {/* ── Pemba's AI risk check (Suspense-streamed from server) ── */}
       {gapsNode}
 
-      {/* ── Still to buy — with full CRUD ── */}
+      {/* ── Shopping list — non-destructive ── */}
       <section className="bg-surface border border-border rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <p className="font-mono text-[11px] uppercase tracking-wider text-text-muted">Still to buy</p>
-          <div className="flex items-center gap-2.5">
-            <span className={`font-mono text-xs font-bold ${toBuyItems.length > 0 ? 'text-accent-3' : 'text-accent-2'}`}>
-              {toBuyItems.length === 0 ? 'All done ✓' : `${toBuyItems.length} items`}
-            </span>
-            <button
-              onClick={openAdd}
-              className="w-7 h-7 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent hover:bg-accent/20 active:scale-90 transition-all"
-              aria-label="Add to-buy item"
-            >
-              <Plus size={13} />
-            </button>
+        <div className="px-4 py-3 border-b border-border">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-[11px] uppercase tracking-wider text-text-muted">To buy before we leave</p>
+            <div className="flex items-center gap-2.5">
+              <span className={`font-mono text-xs font-bold ${toBuyItems.length > 0 ? 'text-accent-3' : 'text-accent-2'}`}>
+                {toBuyItems.length === 0 ? 'All done ✓' : `${toBuyItems.length} items`}
+              </span>
+              <button
+                onClick={openAdd}
+                className="w-7 h-7 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent hover:bg-accent/20 active:scale-90 transition-all"
+                aria-label="Add to-buy item"
+              >
+                <Plus size={13} />
+              </button>
+            </div>
           </div>
+          <p className="font-mono text-[10px] text-text-dim mt-1.5 leading-snug">
+            Removing here won&apos;t delete from your pack — it just clears the shopping flag.
+          </p>
         </div>
 
         {toBuyItems.length === 0 ? (
@@ -369,7 +380,14 @@ export default function SummaryScreen({
                       <span className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center font-mono text-[9px] font-bold ${chip.cls}`}>
                         {chip.label}
                       </span>
-                      <span className="font-body text-sm text-text flex-1 min-w-0 truncate">{item.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-body text-sm text-text truncate">{item.name}</p>
+                        {item.category_id != null && catNameById.has(item.category_id) && (
+                          <p className="font-mono text-[10px] text-text-dim truncate">
+                            in Pack · {catNameById.get(item.category_id)}
+                          </p>
+                        )}
+                      </div>
                       {item.qty && <span className="font-mono text-xs text-text-muted shrink-0">×{item.qty}</span>}
                       <div className="flex items-center gap-1 shrink-0">
                         <button
@@ -387,11 +405,11 @@ export default function SummaryScreen({
                           <Pencil size={11} />
                         </button>
                         <button
-                          onClick={() => handleDelete(item)}
-                          className="w-7 h-7 rounded-full bg-accent-3/10 border border-accent-3/20 flex items-center justify-center text-accent-3 hover:bg-accent-3/20 active:scale-90 transition-all"
-                          title="Delete"
+                          onClick={() => handleRemoveFromShopping(item)}
+                          className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-text hover:border-border active:scale-90 transition-all"
+                          title="Not buying / already have — keeps it in Pack"
                         >
-                          <Trash2 size={11} />
+                          <Ban size={11} />
                         </button>
                       </div>
                     </div>

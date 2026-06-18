@@ -44,6 +44,20 @@ export async function updateItem(id: string, data: {
   revalidatePath('/to-buy')
 }
 
+/**
+ * Remove an item from the "to buy" shopping view WITHOUT deleting it.
+ * Sets status to 'standard' so it leaves the shopping list but remains in Pack.
+ */
+export async function removeFromShopping(id: string) {
+  const supabase = await createClient()
+  const payload: TablesUpdate<'items'> = { status: 'standard' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('items') as any).update(payload).eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/pack')
+  revalidatePath('/to-buy')
+}
+
 export async function deleteItem(id: string) {
   const supabase = await createClient()
   await supabase.from('packed').delete().eq('item_id', id)

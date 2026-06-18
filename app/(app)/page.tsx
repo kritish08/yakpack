@@ -46,7 +46,7 @@ export default async function TodayPage() {
 
       {/* Weather */}
       {wx ? (
-        <WeatherHero wx={wx} altitude_m={todayLeg?.altitude_m ?? 0} activeTags={activeTags} />
+        <WeatherHero wx={wx} altitude_m={todayLeg?.altitude_m ?? 0} activeTags={activeTags} leg={todayLeg ?? null} />
       ) : (
         <div className="bg-surface border border-border rounded-2xl p-5 font-mono text-sm text-text-muted">
           Weather unavailable — check your connection
