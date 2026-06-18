@@ -33,6 +33,7 @@ export async function updateItem(id: string, data: {
   status?: 'owned' | 'to_buy' | 'standard'
   assigned_to?: 'kritish' | 'partner' | 'shared'
   scope?: 'each' | 'shared'
+  category_id?: number
 }) {
   const supabase = await createClient()
   const payload: TablesUpdate<'items'> = data

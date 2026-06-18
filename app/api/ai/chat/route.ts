@@ -8,6 +8,7 @@ export const maxDuration = 30
 
 type ItineraryRow = Database['public']['Tables']['itinerary']['Row']
 type ItemRow = Database['public']['Tables']['items']['Row']
+type CategoryRow = Database['public']['Tables']['categories']['Row']
 
 export async function POST(req: Request) {
   if (!AI_ENABLED) return new Response('AI not enabled', { status: 403 })
@@ -27,6 +28,9 @@ export async function POST(req: Request) {
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
     tools: {
+
+      // ── Read tools (auto-execute) ──────────────────────────────────
+
       getCurrentLeg: tool({
         description: "Get today's itinerary leg based on the current date.",
         inputSchema: z.object({}),
@@ -76,41 +80,95 @@ export async function POST(req: Request) {
         },
       }),
 
+      getCategories: tool({
+        description: 'Get all packing categories with their IDs — use before addItems to pick the right category.',
+        inputSchema: z.object({}),
+        execute: async () => {
+          const { data } = await supabase
+            .from('categories')
+            .select('id, name, icon, sort_order')
+            .order('sort_order')
+          return data as Pick<CategoryRow, 'id' | 'name' | 'icon' | 'sort_order'>[] | null
+        },
+      }),
+
       getPackingState: tool({
-        description: 'Get packing list items with their status.',
+        description: 'Get full packing list — items with status, category, assignment, qty, and whether each is packed.',
         inputSchema: z.object({
           filter: z.enum(['all', 'unpacked', 'to_buy']).optional()
             .describe('Filter: all items, unpacked only, or items still to buy'),
         }),
         execute: async ({ filter }: { filter?: 'all' | 'unpacked' | 'to_buy' }) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let q = (supabase.from('items') as any).select('id, name, status, assigned_to, scope, carry_tags').order('sort_order')
+          let q = (supabase.from('items') as any)
+            .select('id, name, status, assigned_to, scope, carry_tags, category_id, qty, note')
+            .order('sort_order')
           if (filter === 'to_buy') q = q.eq('status', 'to_buy')
-          const { data: items } = await q as { data: Pick<ItemRow, 'id' | 'name' | 'status' | 'assigned_to'>[] | null }
+          const { data: items } = await q as {
+            data: Pick<ItemRow, 'id' | 'name' | 'status' | 'assigned_to' | 'scope' | 'category_id' | 'qty' | 'note'>[] | null
+          }
 
           if (filter === 'unpacked') {
             const { data: packed } = await supabase.from('packed').select('item_id')
             const packedSet = new Set(packed?.map((p: { item_id: string }) => p.item_id))
-            return (items ?? []).filter((i) => !packedSet.has(i.id))
+            return (items ?? []).filter(i => !packedSet.has(i.id))
           }
           return items
         },
       }),
 
+      // ── Write tools (no execute — user must confirm via client UI) ──
+
       addItems: tool({
         description:
-          'Suggest items to add to the packing list. Always tell the user what you are adding BEFORE calling this tool. The user must confirm before items are saved.',
+          'Suggest items to add to the packing list. Always tell the user what you are adding BEFORE calling this. Use getCategories() first if you need the right category_id.',
         inputSchema: z.object({
           items: z.array(z.object({
-            name: z.string().describe('Item name'),
-            qty: z.string().optional().describe('Optional quantity, e.g. "2"'),
-            status: z.enum(['owned', 'to_buy', 'standard']).default('standard'),
+            name:        z.string().describe('Item name'),
+            qty:         z.string().optional().describe('Optional quantity, e.g. "2"'),
+            status:      z.enum(['owned', 'to_buy', 'standard']).default('standard'),
             assigned_to: z.enum(['kritish', 'partner', 'shared']).default('shared'),
+            category_id: z.number().optional().describe('Category ID from getCategories — omit to use default'),
           })),
           reason: z.string().describe('Why these items are suggested'),
         }),
-        // No execute — client handles confirm + actual DB write
       }),
+
+      updateItem: tool({
+        description:
+          'Update an existing packing list item. Always describe the change to the user BEFORE calling this — they must confirm. Use getPackingState() to find the item ID first.',
+        inputSchema: z.object({
+          id:      z.string().describe('Item ID to update (from getPackingState)'),
+          changes: z.object({
+            name:        z.string().optional().describe('New item name'),
+            qty:         z.string().nullable().optional().describe('New quantity, or null to clear'),
+            status:      z.enum(['owned', 'to_buy', 'standard']).optional(),
+            assigned_to: z.enum(['kritish', 'partner', 'shared']).optional(),
+            category_id: z.number().optional(),
+          }),
+          reason: z.string().describe('Why this change is being made'),
+        }),
+      }),
+
+      deleteItem: tool({
+        description:
+          'Delete a packing list item permanently. Always confirm with the user BEFORE calling. Use getPackingState() to find the item ID first.',
+        inputSchema: z.object({
+          id:     z.string().describe('Item ID to delete'),
+          name:   z.string().describe('Item name for display in confirmation'),
+          reason: z.string().describe('Why this item should be removed'),
+        }),
+      }),
+
+      markAsBought: tool({
+        description:
+          "Mark a to-buy item as purchased (changes status to 'owned'). Tell the user first, then they confirm.",
+        inputSchema: z.object({
+          id:   z.string().describe('Item ID'),
+          name: z.string().describe('Item name for display in confirmation'),
+        }),
+      }),
+
     },
   })
 
