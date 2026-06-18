@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Check, Pencil, Trash2, X, Sparkles } from 'lucide-react'
 import type { CategoryWithToBuy, Item, Packed, Profile, Category, Trip } from '@/lib/tobuy'
@@ -25,6 +25,7 @@ interface SummaryScreenProps {
   trip:                 Trip | null
   today:                string
   aiEnabled?:           boolean
+  gapsNode?:            ReactNode
 }
 
 type AssignedTo = 'kritish' | 'partner' | 'shared'
@@ -71,7 +72,7 @@ function BottomSheet({ onClose, children }: { onClose: () => void; children: Rea
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function SummaryScreen({
-  profile, categories, allItems, categoriesWithToBuy, packed, trip, today, aiEnabled,
+  profile, categories, allItems, categoriesWithToBuy, packed, trip, today, aiEnabled, gapsNode,
 }: SummaryScreenProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -321,6 +322,9 @@ export default function SummaryScreen({
           </div>
         ))}
       </div>
+
+      {/* ── Pemba's AI risk check (Suspense-streamed from server) ── */}
+      {gapsNode}
 
       {/* ── Still to buy — with full CRUD ── */}
       <section className="bg-surface border border-border rounded-2xl overflow-hidden">
