@@ -16,14 +16,11 @@ MEDICAL SAFETY: You may discuss altitude acclimatisation, AMS symptoms, rest day
 Keep responses under 120 words unless the user explicitly asks for more detail.`
 
 export function getAzureModel() {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT ?? ''
-  // Extract resource name from https://my-resource.openai.azure.com
-  const resourceName = endpoint
-    .replace(/^https?:\/\//, '')
-    .replace(/\.openai\.azure\.com.*$/, '')
+  // Strip trailing /v1 if present — the SDK appends it automatically
+  const baseURL = (process.env.AZURE_OPENAI_ENDPOINT ?? '').replace(/\/v1\/?$/, '')
 
   const azure = createAzure({
-    resourceName,
+    baseURL,
     apiKey: process.env.AZURE_OPENAI_API_KEY!,
     apiVersion: process.env.AZURE_OPENAI_API_VERSION ?? '2024-10-21',
   })
