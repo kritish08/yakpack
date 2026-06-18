@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Sun, Package, ShoppingCart, Map, MessageCircle, Settings } from 'lucide-react'
 import ThemeToggle from '@/components/theme-toggle'
 import PageTransition from '@/components/page-transition'
+import OfflineIndicator from '@/components/offline-indicator'
 
 const tabs = [
   { label: 'Today',  href: '/',       icon: Sun },
@@ -18,6 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   return (
     <div className="flex flex-col min-h-screen bg-bg">
+      <OfflineIndicator />
       {/* Top bar */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <span className="font-display font-bold text-xl uppercase tracking-tight text-text">
