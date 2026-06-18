@@ -12,9 +12,14 @@ import ConfirmAddSheet from './confirm-add-sheet'
 import ConfirmActionSheet, { type ActionType, type UpdateItemInput, type DeleteItemInput, type MarkAsBoughtInput } from './confirm-action-sheet'
 import { addItem, updateItem as updateItemAction, deleteItem as deleteItemAction } from '@/app/actions/items'
 
+import type { StoredMessage } from './chat-wrapper'
+
 interface ChatScreenProps {
-  briefing: string | null
+  briefing:          string | null
   defaultCategoryId: number
+  initialMessages?:  StoredMessage[]
+  onSaveMessages?:   (messages: StoredMessage[]) => void
+  onShowHistory?:    () => void
 }
 
 interface AddItemsInput {
@@ -57,19 +62,40 @@ function mkComponents(isUser: boolean) {
   }
 }
 
-export default function ChatScreen({ briefing, defaultCategoryId }: ChatScreenProps) {
+export default function ChatScreen({
+  briefing,
+  defaultCategoryId,
+  initialMessages,
+  onSaveMessages,
+  onShowHistory,
+}: ChatScreenProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
   const [input, setInput] = useState('')
 
+  // Build seed messages: loaded history takes precedence over fresh briefing
+  const seedMessages: any[] = initialMessages
+    ? (initialMessages as any[])
+    : briefing
+      ? [{ id: 'briefing', role: 'assistant' as const, parts: [{ type: 'text' as const, text: briefing }] }]
+      : []
+
   const { messages, sendMessage, addToolResult, status } = useChat({
     transport: new DefaultChatTransport({ api: '/api/ai/chat' }),
-    messages: briefing ? [{
-      id: 'briefing',
-      role: 'assistant' as const,
-      parts: [{ type: 'text' as const, text: briefing }],
-    }] : [],
+    messages: seedMessages,
   })
+
+  // Save conversation to parent whenever messages settle (status becomes idle)
+  const prevStatus = useRef(status)
+  useEffect(() => {
+    const wasActive = prevStatus.current === 'streaming' || prevStatus.current === 'submitted'
+    const isIdle    = status === 'ready' || status === 'error'
+    if (wasActive && isIdle && messages.length > 0 && onSaveMessages) {
+      onSaveMessages(messages as any as StoredMessage[])
+    }
+    prevStatus.current = status
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
 
   const isLoading  = status === 'streaming' || status === 'submitted'
   const isStreaming = status === 'streaming'

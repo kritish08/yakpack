@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { getTodayData, fetchWeather } from '@/lib/today'
 import { deriveCarryTags } from '@/lib/weather'
 import WeatherHero from '@/components/today/weather-hero'
@@ -5,9 +6,10 @@ import CarryChips from '@/components/today/carry-chips'
 import LegCard from '@/components/today/leg-card'
 import HeadsUp from '@/components/today/heads-up'
 import Pemba, { deriveMood } from '@/components/pemba/pemba'
+import AiBriefingCard, { AiBriefingCardSkeleton } from '@/components/today/ai-briefing-card'
 
 export default async function TodayPage() {
-  const { todayLeg, items, isToday, isFuture, isPast } = await getTodayData()
+  const { todayLeg, items, packedIds, isToday, isFuture, isPast } = await getTodayData()
 
   const wx = todayLeg ? await fetchWeather(todayLeg.lat, todayLeg.lon) : null
   const activeTags = wx && todayLeg ? deriveCarryTags(wx, todayLeg.altitude_m ?? 0) : []
@@ -21,15 +23,20 @@ export default async function TodayPage() {
 
   return (
     <div className="px-4 pt-4 pb-6 flex flex-col gap-3">
-      {/* Page header */}
+      {/* Header */}
       <div>
         <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text">Today</h1>
-        {isPast && <p className="font-mono text-xs text-text-muted mt-0.5">Trip complete — showing last day</p>}
+        {isPast   && <p className="font-mono text-xs text-text-muted mt-0.5">Trip complete — showing last day</p>}
         {isFuture && <p className="font-mono text-xs text-accent mt-0.5">Trip starts {todayLeg?.date} · showing Day 1 preview</p>}
       </div>
 
       {/* Pemba mascot */}
       <Pemba mood={mood} />
+
+      {/* AI briefing — streams in via Suspense; rest of page is already visible */}
+      <Suspense fallback={<AiBriefingCardSkeleton />}>
+        <AiBriefingCard />
+      </Suspense>
 
       {/* Today's leg */}
       {todayLeg && <LegCard leg={todayLeg} isToday={isToday} isFuture={isFuture} />}
@@ -37,7 +44,7 @@ export default async function TodayPage() {
       {/* Warnings */}
       {todayLeg && <HeadsUp warnings={todayLeg.warnings} />}
 
-      {/* Weather hero */}
+      {/* Weather */}
       {wx ? (
         <WeatherHero wx={wx} altitude_m={todayLeg?.altitude_m ?? 0} activeTags={activeTags} />
       ) : (
@@ -46,12 +53,13 @@ export default async function TodayPage() {
         </div>
       )}
 
-      {/* Carry chips */}
+      {/* Carry chips with packed status */}
       {todayLeg && (
         <CarryChips
           items={items}
           activeTags={activeTags}
           carryToday={todayLeg.carry_today ?? []}
+          packedIds={packedIds}
         />
       )}
     </div>

@@ -1,8 +1,9 @@
 import { AI_ENABLED } from '@/lib/ai'
 import { createClient } from '@/lib/supabase/server'
-import ChatScreen from '@/components/ask/chat-screen'
+import ChatWrapper from '@/components/ask/chat-wrapper'
 
 async function fetchBriefing(): Promise<string | null> {
+  if (!AI_ENABLED) return null
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/ai/briefing`,
@@ -39,7 +40,7 @@ export default async function AskPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <ChatScreen briefing={briefing} defaultCategoryId={defaultCategoryId} />
+      <ChatWrapper briefing={briefing} defaultCategoryId={defaultCategoryId} />
     </div>
   )
 }

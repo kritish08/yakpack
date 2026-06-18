@@ -19,15 +19,17 @@ export async function getTodayData() {
 
   const today = new Date().toISOString().slice(0, 10)
 
-  const [legsRes, itemsRes, profileRes] = await Promise.all([
+  const [legsRes, itemsRes, profileRes, packedRes] = await Promise.all([
     supabase.from('itinerary').select('*').order('day'),
     supabase.from('items').select('*'),
     supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('packed').select('item_id'),
   ])
 
-  const legs = (legsRes.data ?? []) as Leg[]
-  const items = (itemsRes.data ?? []) as Item[]
+  const legs    = (legsRes.data    ?? []) as Leg[]
+  const items   = (itemsRes.data   ?? []) as Item[]
   const profile = profileRes.data!
+  const packedIds = new Set((packedRes.data ?? []).map((r: { item_id: string }) => r.item_id))
 
   // Find today's leg; if before trip show Day 1 preview; if after trip show last day
   const todayLeg: Leg | undefined =
@@ -39,7 +41,7 @@ export async function getTodayData() {
   const isFuture = todayLeg?.date ? today < todayLeg.date : false
   const isPast = todayLeg?.date ? today > todayLeg.date : false
 
-  return { todayLeg, legs, items, profile, isToday, isFuture, isPast }
+  return { todayLeg, legs, items, profile, packedIds, isToday, isFuture, isPast }
 }
 
 // Calls Open-Meteo directly — avoids SSRF from trusting Host header to build an internal URL.
