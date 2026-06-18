@@ -6,6 +6,13 @@ export type Leg = Database['public']['Tables']['itinerary']['Row']
 export type Trip = Database['public']['Tables']['trip']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
 
+export interface LegWeather {
+  temp_max: number
+  temp_min: number
+  rain_pct: number
+  uv:       number
+}
+
 export async function getPlanData() {
   const cookieStore = await cookies()
   const supabase = createServerClient<Database>(

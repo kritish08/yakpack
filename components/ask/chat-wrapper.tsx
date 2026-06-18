@@ -60,9 +60,11 @@ interface HistoryPanelProps {
 
 function HistoryPanel({ conversations, currentId, onLoad, onNew, onDelete, onClose }: HistoryPanelProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
+    // z-[60] to float above bottom nav (z-50)
+    <div className="fixed inset-0 z-[60]">
       <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface rounded-t-2xl border-t border-border w-full max-w-lg mx-auto pb-safe max-h-[70vh] flex flex-col">
+      <div className="absolute inset-x-0 bottom-14 flex items-end">
+      <div className="relative bg-surface rounded-t-2xl border-t border-border w-full max-w-lg mx-auto max-h-[70vh] flex flex-col overflow-hidden">
         {/* Drag handle */}
         <div className="w-10 h-1 bg-border rounded-full mx-auto mt-3 mb-0 shrink-0" />
 
@@ -126,6 +128,7 @@ function HistoryPanel({ conversations, currentId, onLoad, onNew, onDelete, onClo
             })
           )}
         </div>
+      </div>
       </div>
     </div>
   )

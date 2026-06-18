@@ -57,16 +57,17 @@ function TripChip({ trip, today }: { trip: Trip | null; today: string }) {
 // ── Bottom sheet wrapper ────────────────────────────────────────────────────────
 function BottomSheet({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{ paddingBottom: 56 }}
-    >
+    // z-[60] to sit above the bottom nav which is z-50
+    <div className="fixed inset-0 z-[60]">
       <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className="relative bg-surface rounded-t-2xl border-t border-border w-full max-w-lg mx-auto flex flex-col overflow-hidden"
-        style={{ maxHeight: 'calc(100dvh - 76px)' }}
-      >
-        {children}
+      {/* absolute bottom-14 = 56px — clear the 56px nav, then grow upward */}
+      <div className="absolute inset-x-0 bottom-14 flex items-end">
+        <div
+          className="relative bg-surface rounded-t-2xl border-t border-border w-full max-w-lg mx-auto flex flex-col overflow-hidden"
+          style={{ maxHeight: 'calc(100dvh - 56px - 20px)' }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   )

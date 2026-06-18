@@ -268,17 +268,26 @@ export default function ChatScreen({
               )
             })}
 
-            {/* Typing dots — waiting for first token */}
-            {status === 'submitted' && (messages as any[]).at(-1)?.role === 'user' && (
-              <div className="flex gap-2.5">
-                <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">🐂</div>
-                <div className="px-3.5 py-3 rounded-2xl rounded-bl-sm bg-surface border border-border flex gap-1.5 items-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:0ms]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:120ms]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:240ms]" />
+            {/* Typing dots — waiting for first token OR streaming with only tool calls so far */}
+            {(() => {
+              if (!isLoading) return null
+              const lastMsg = (messages as any[]).at(-1)
+              // Show dots when: last message is from user (submitted, not yet responded)
+              // OR last message is assistant with no visible text yet (tool calls in flight)
+              const noVisibleText = !lastMsg || lastMsg.role === 'user' ||
+                !(lastMsg.parts ?? []).some((p: any) => p.type === 'text' && p.text?.trim())
+              if (!noVisibleText) return null
+              return (
+                <div className="flex gap-2.5">
+                  <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-sm shrink-0 mt-0.5">🐂</div>
+                  <div className="px-3.5 py-3 rounded-2xl rounded-bl-sm bg-surface border border-border flex gap-1.5 items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:120ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent/60 animate-bounce [animation-delay:240ms]" />
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             <div ref={bottomRef} />
           </div>

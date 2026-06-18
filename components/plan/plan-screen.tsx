@@ -1,24 +1,27 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import type { Leg, Trip, Profile } from '@/lib/plan'
+import { useEffect, useRef, type ReactNode } from 'react'
+import type { Leg, Trip, Profile, LegWeather } from '@/lib/plan'
 import DayCard from './day-card'
 
 interface PlanScreenProps {
-  legs: Leg[]
-  trip: Trip | null
-  profile: Profile
-  today: string
+  legs:            Leg[]
+  trip:            Trip | null
+  profile:         Profile
+  today:           string
+  weatherMap?:     Record<number, LegWeather | null>
+  todayInsightNode?: ReactNode
+  aiEnabled?:      boolean
 }
 
-export default function PlanScreen({ legs, trip, profile, today }: PlanScreenProps) {
+export default function PlanScreen({ legs, trip, profile, today, weatherMap, todayInsightNode, aiEnabled }: PlanScreenProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const stripRef = useRef<HTMLDivElement>(null)
   const todayIndex = legs.findIndex(l => l.date === today)
 
-  const departDate = legs[0]?.date ?? ''
+  const departDate  = legs[0]?.date ?? ''
   const tripStarted = departDate && today >= departDate
-  const tripEnded = legs.length > 0 && today > (legs[legs.length - 1].date ?? '')
+  const tripEnded   = legs.length > 0 && today > (legs[legs.length - 1].date ?? '')
 
   const daysToGo = departDate && !tripStarted
     ? Math.ceil((new Date(departDate + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
@@ -28,7 +31,6 @@ export default function PlanScreen({ legs, trip, profile, today }: PlanScreenPro
     const ref = cardRefs.current[todayIndex >= 0 ? todayIndex : 0]
     ref?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
-    // scroll the journey strip to center the active pill
     const strip = stripRef.current
     if (strip && todayIndex >= 0) {
       const pill = strip.children[todayIndex] as HTMLElement | undefined
@@ -55,7 +57,6 @@ export default function PlanScreen({ legs, trip, profile, today }: PlanScreenPro
               {legs.length} days · {profile.display_name}
             </p>
           </div>
-          {/* Status chip */}
           {tripEnded ? (
             <span className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-border/30 text-text-muted border border-border shrink-0">
               Complete
@@ -100,7 +101,7 @@ export default function PlanScreen({ legs, trip, profile, today }: PlanScreenPro
         >
           {legs.map((leg, i) => {
             const isToday = leg.date === today
-            const isPast = !!leg.date && today > leg.date
+            const isPast  = !!leg.date && today > leg.date
             return (
               <button
                 key={leg.day}
@@ -123,15 +124,22 @@ export default function PlanScreen({ legs, trip, profile, today }: PlanScreenPro
 
       {/* Day cards */}
       <div className="px-4 pt-4 flex flex-col gap-4">
-        {legs.map((leg, i) => (
-          <DayCard
-            key={leg.day}
-            leg={leg}
-            isToday={leg.date === today}
-            isPast={!!leg.date && today > leg.date}
-            cardRef={el => { cardRefs.current[i] = el }}
-          />
-        ))}
+        {legs.map((leg, i) => {
+          const isToday = leg.date === today
+          const isPast  = !!leg.date && today > leg.date
+          return (
+            <DayCard
+              key={leg.day}
+              leg={leg}
+              isToday={isToday}
+              isPast={isPast}
+              cardRef={el => { cardRefs.current[i] = el }}
+              weather={weatherMap?.[leg.day] ?? null}
+              insightNode={isToday ? todayInsightNode : undefined}
+              aiEnabled={aiEnabled}
+            />
+          )
+        })}
 
         {legs.length === 0 && (
           <div className="text-center py-16">
