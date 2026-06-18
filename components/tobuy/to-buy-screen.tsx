@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Check, Pencil, Trash2, Ban, X, Sparkles } from 'lucide-react'
+import { Plus, Check, Pencil, Trash2, Ban, X, Sparkles, Search } from 'lucide-react'
 import type { CategoryWithToBuy, Item, Packed, Profile, Category, Trip } from '@/lib/tobuy'
 import { overallProgress, personProgress, categoryProgress } from '@/lib/progress'
 import { addItem, updateItem, removeFromShopping } from '@/app/actions/items'
@@ -107,21 +107,31 @@ export default function SummaryScreen({
   const [isSaving,     setIsSaving]     = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
 
+  // ── Shopping-list search ──────────────────────────────────────────────────────
+  const [shopQuery, setShopQuery] = useState('')
+
   // ── Category sheet state ─────────────────────────────────────────────────────
   const [catSheet,   setCatSheet]   = useState<CatSheetState | null>(null)
   const [catForm,    setCatForm]    = useState<CatFormState>({ name: '', icon: '' })
   const [isCatSaving, setIsCatSaving] = useState(false)
   const [catError,    setCatError]   = useState<string | null>(null)
 
-  // Grouped view
-  const localCatsWithToBuy: CategoryWithToBuy[] = localCategories
-    .map(cat => ({ ...cat, items: toBuyItems.filter(i => i.category_id === cat.id) }))
-    .filter(cat => cat.items.length > 0)
-
   // Map category id → name for the "in Pack · {category}" row caption
   const catNameById = new Map<number, string>(
     localCategories.map(c => [c.id as number, c.name])
   )
+
+  // Grouped view — filtered by the shopping-list search query
+  const sq = shopQuery.trim().toLowerCase()
+  const visibleToBuy = sq
+    ? toBuyItems.filter(i =>
+        i.name.toLowerCase().includes(sq) ||
+        (catNameById.get(i.category_id ?? -1)?.toLowerCase().includes(sq) ?? false)
+      )
+    : toBuyItems
+  const localCatsWithToBuy: CategoryWithToBuy[] = localCategories
+    .map(cat => ({ ...cat, items: visibleToBuy.filter(i => i.category_id === cat.id) }))
+    .filter(cat => cat.items.length > 0)
 
   const partnerRole = profile.role === 'kritish' ? 'partner' : 'kritish'
   const myLabel     = profile.display_name || (profile.role === 'kritish' ? 'Kritish' : 'Gitansh')
@@ -353,6 +363,30 @@ export default function SummaryScreen({
           <p className="font-mono text-[10px] text-text-dim mt-1.5 leading-snug">
             Removing here won&apos;t delete from your pack — it just clears the shopping flag.
           </p>
+
+          {/* Search */}
+          {toBuyItems.length > 0 && (
+            <div className="relative mt-2.5">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-dim pointer-events-none" />
+              <input
+                type="text"
+                value={shopQuery}
+                onChange={e => setShopQuery(e.target.value)}
+                placeholder="Search to-buy items…"
+                aria-label="Search to-buy items"
+                className="w-full h-9 bg-surface-2 border border-border rounded-xl pl-8 pr-8 text-sm text-text font-body outline-none focus:border-accent/60 transition-colors placeholder:text-text-dim"
+              />
+              {shopQuery && (
+                <button
+                  onClick={() => setShopQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-dim hover:text-text transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {toBuyItems.length === 0 ? (
@@ -363,6 +397,14 @@ export default function SummaryScreen({
               className="mt-1 px-4 py-1.5 rounded-full border border-dashed border-border text-text-muted font-body text-xs hover:border-accent/40 hover:text-accent transition-colors flex items-center gap-1.5"
             >
               <Plus size={11} /> Add item
+            </button>
+          </div>
+        ) : localCatsWithToBuy.length === 0 ? (
+          <div className="px-4 py-6 flex flex-col items-center gap-2">
+            <Search size={20} className="text-text-dim" />
+            <p className="font-mono text-xs text-text-muted text-center">No to-buy items match &ldquo;{shopQuery.trim()}&rdquo;</p>
+            <button onClick={() => setShopQuery('')} className="font-mono text-[11px] text-accent hover:underline">
+              Clear search
             </button>
           </div>
         ) : (
