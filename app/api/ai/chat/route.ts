@@ -1,4 +1,4 @@
-import { streamText, tool, stepCountIs } from 'ai'
+import { streamText, tool, stepCountIs, convertToModelMessages } from 'ai'
 import { z } from 'zod'
 import { AI_ENABLED, getAzureModel, PEMBA_SYSTEM } from '@/lib/ai'
 import { createClient } from '@/lib/supabase/server'
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   const result = streamText({
     model: getAzureModel(),
     system: PEMBA_SYSTEM,
-    messages,
+    messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
     tools: {
       getCurrentLeg: tool({
