@@ -42,7 +42,7 @@ export async function getBriefing(): Promise<string | null> {
     if (leg.lat && leg.lon) {
       try {
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${leg.lat}&longitude=${leg.lon}&current=temperature_2m,apparent_temperature&daily=temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_probability_max&forecast_days=1&timezone=auto`
-        const wx = await fetch(url).then(r => r.json())
+        const wx = await fetch(url, { next: { revalidate: 1800 } }).then(r => r.json())
         const d = wx.daily
         weatherSummary = `Today's weather at ${leg.leg}: ${wx.current?.temperature_2m}°C (feels ${wx.current?.apparent_temperature}°C). High ${d?.temperature_2m_max?.[0]}° / Low ${d?.temperature_2m_min?.[0]}°. UV ${d?.uv_index_max?.[0]}, rain ${d?.precipitation_probability_max?.[0]}%.`
       } catch {

@@ -21,11 +21,10 @@ export async function getToBuyData() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const [profileRes, categoriesRes, allItemsRes, toBuyItemsRes, packedRes, tripRes] = await Promise.all([
+  const [profileRes, categoriesRes, allItemsRes, packedRes, tripRes] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('categories').select('*').order('sort_order'),
     supabase.from('items').select('*').order('sort_order'),
-    supabase.from('items').select('*').eq('status', 'to_buy').order('sort_order'),
     supabase.from('packed').select('*'),
     supabase.from('trip').select('*').eq('id', 1).single(),
   ])
@@ -33,7 +32,8 @@ export async function getToBuyData() {
   const profile = profileRes.data!
   const categories = (categoriesRes.data ?? []) as Category[]
   const allItems = (allItemsRes.data ?? []) as Item[]
-  const toBuyItems = (toBuyItemsRes.data ?? []) as Item[]
+  // Derive the to-buy subset from allItems — avoids a second full table scan.
+  const toBuyItems = allItems.filter(i => i.status === 'to_buy')
   const packed = (packedRes.data ?? []) as Packed[]
   const trip = tripRes.data as Trip | null
 

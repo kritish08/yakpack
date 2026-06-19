@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export const revalidate = 1800 // 30 min cache
 
 export async function GET(request: NextRequest) {
+  // Defense-in-depth: the proxy already gates this route, but require a session
+  // here too so the Open-Meteo proxy is never an open relay.
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return new NextResponse('Unauthorized', { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const lat = searchParams.get('lat')
   const lon = searchParams.get('lon')

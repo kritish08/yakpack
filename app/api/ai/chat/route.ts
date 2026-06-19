@@ -95,7 +95,7 @@ export async function POST(req: Request) {
           if (!leg?.lat) return { error: 'Day not found' }
           try {
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${leg.lat}&longitude=${leg.lon}&current=temperature_2m,weather_code,apparent_temperature,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_probability_max,sunrise,sunset&forecast_days=1&timezone=auto`
-            const wx = await fetch(url).then(r => r.json())
+            const wx = await fetch(url, { next: { revalidate: 1800 } }).then(r => r.json())
             return { leg: leg.leg, altitude_m: leg.altitude_m, weather: wx }
           } catch {
             return { error: 'Weather fetch failed' }

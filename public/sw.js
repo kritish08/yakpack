@@ -10,7 +10,7 @@
 //   - Weather: network-first with stale fallback.
 //   - Other /api/* (AI etc.): network-only.
 
-const CACHE_VERSION = 'yakpack-v2'
+const CACHE_VERSION = 'yakpack-v3'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 const PAGE_CACHE = `${CACHE_VERSION}-pages`
 const DATA_CACHE = `${CACHE_VERSION}-data`
@@ -88,7 +88,7 @@ self.addEventListener('fetch', (event) => {
         .then((res) => {
           if (res.ok) {
             const clone = res.clone()
-            caches.open(PAGE_CACHE).then((c) => c.put(request, clone))
+            putCapped(PAGE_CACHE, request, clone)
           }
           return res
         })
@@ -109,13 +109,27 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
+// Cap a cache to its most-recent N entries (FIFO) so DATA_CACHE / PAGE_CACHE
+// can't grow unbounded over a multi-week trip and get the whole origin evicted.
+const CACHE_LIMITS = { [DATA_CACHE]: 80, [PAGE_CACHE]: 30 }
+async function putCapped(cacheName, request, response) {
+  const cache = await caches.open(cacheName)
+  await cache.put(request, response)
+  const limit = CACHE_LIMITS[cacheName]
+  if (!limit) return
+  const keys = await cache.keys()
+  if (keys.length > limit) {
+    for (const k of keys.slice(0, keys.length - limit)) await cache.delete(k)
+  }
+}
+
 // network-first: fresh when online, last-known when offline.
 async function networkFirst(request, cacheName) {
   try {
     const res = await fetch(request)
     if (res.ok) {
       const clone = res.clone()
-      caches.open(cacheName).then((c) => c.put(request, clone))
+      putCapped(cacheName, request, clone)
     }
     return res
   } catch {

@@ -3,16 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { TablesInsert, TablesUpdate } from '@/lib/database.types'
-
-// Collapse newlines/control chars to single spaces, trim, and cap length.
-function sanitizeName(s: string, max = 200): string {
-  let out = ''
-  for (const ch of s) {
-    const code = ch.codePointAt(0) ?? 0
-    out += code < 0x20 || code === 0x7f ? ' ' : ch
-  }
-  return out.replace(/\s+/g, ' ').trim().slice(0, max)
-}
+import { sanitizeText as sanitizeName } from '@/lib/sanitize'
 
 export async function addItem(data: {
   category_id: number

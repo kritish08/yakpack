@@ -1,6 +1,7 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeText } from '@/lib/sanitize'
 
 export async function markAsBought(itemId: string) {
   const supabase = await createClient()
@@ -28,9 +29,9 @@ export async function addToBuyItem(data: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('items') as any).insert({
     category_id: data.category_id,
-    name: data.name,
+    name: sanitizeText(data.name),
     qty: data.qty ?? null,
-    note: data.note ?? null,
+    note: data.note != null ? sanitizeText(data.note, 500) : null,
     assigned_to: data.assigned_to,
     status: 'to_buy',
     scope: data.assigned_to === 'shared' ? 'shared' : 'each',

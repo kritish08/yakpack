@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import type { Leg, Trip, Profile, LegWeather } from '@/lib/plan'
 import { amsRisk } from '@/lib/ams'
 import DayCard from './day-card'
@@ -19,6 +19,12 @@ export default function PlanScreen({ legs, trip, profile, today, weatherMap, tod
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const stripRef = useRef<HTMLDivElement>(null)
   const todayIndex = legs.findIndex(l => l.date === today)
+
+  // Precompute AMS risk once per legs change instead of O(n²) inside the render loop.
+  const amsByDay = useMemo(
+    () => Object.fromEntries(legs.map(l => [l.day, amsRisk(legs, l.day)])),
+    [legs],
+  )
 
   const departDate  = legs[0]?.date ?? ''
   const tripStarted = departDate && today >= departDate
@@ -138,7 +144,7 @@ export default function PlanScreen({ legs, trip, profile, today, weatherMap, tod
               weather={weatherMap?.[leg.day] ?? null}
               insightNode={isToday ? todayInsightNode : undefined}
               aiEnabled={aiEnabled}
-              ams={amsRisk(legs, leg.day)}
+              ams={amsByDay[leg.day]}
             />
           )
         })}

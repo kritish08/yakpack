@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeText } from '@/lib/sanitize'
 
 export async function addCategory(data: { name: string; icon?: string }) {
   const supabase = await createClient()
@@ -18,8 +19,8 @@ export async function addCategory(data: { name: string; icon?: string }) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).from('categories').insert({
-    name:       data.name.trim(),
-    icon:       data.icon?.trim() || null,
+    name:       sanitizeText(data.name, 60),
+    icon:       data.icon ? sanitizeText(data.icon, 8) || null : null,
     sort_order,
   })
   if (error) throw new Error((error as { message: string }).message)
@@ -32,8 +33,8 @@ export async function updateCategory(id: number, data: { name?: string; icon?: s
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
   const payload = {
-    ...(data.name !== undefined ? { name: data.name.trim() } : {}),
-    ...(data.icon !== undefined ? { icon: data.icon?.trim() || null } : {}),
+    ...(data.name !== undefined ? { name: sanitizeText(data.name, 60) } : {}),
+    ...(data.icon !== undefined ? { icon: data.icon ? sanitizeText(data.icon, 8) || null : null } : {}),
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).from('categories').update(payload).eq('id', id)
