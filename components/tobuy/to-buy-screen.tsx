@@ -223,18 +223,20 @@ export default function SummaryScreen({
   }
 
   function handleMarkBought(item: Item) {
-    setToBuyItems(prev => prev.filter(i => i.id !== item.id))
-    updateItem(item.id, { status: 'owned' }).catch(() => {
-      setToBuyItems(prev => [...prev, item])
-    })
+    const prev = toBuyItems
+    setToBuyItems(prev.filter(i => i.id !== item.id))
+    updateItem(item.id, { status: 'owned' })
+      .then(() => startTransition(() => router.refresh()))
+      .catch(() => setToBuyItems(prev))
   }
 
   // "Not buying / already have" — leaves the shopping list but stays in Pack.
   function handleRemoveFromShopping(item: Item) {
-    setToBuyItems(prev => prev.filter(i => i.id !== item.id))
-    removeFromShopping(item.id).catch(() => {
-      setToBuyItems(prev => [...prev, item])
-    })
+    const prev = toBuyItems
+    setToBuyItems(prev.filter(i => i.id !== item.id))
+    removeFromShopping(item.id)
+      .then(() => startTransition(() => router.refresh()))
+      .catch(() => setToBuyItems(prev))
   }
 
   // ── Category sheet handlers ──────────────────────────────────────────────────
@@ -434,22 +436,25 @@ export default function SummaryScreen({
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => handleMarkBought(item)}
-                          className="w-7 h-7 rounded-full bg-accent-2/10 border border-accent-2/20 flex items-center justify-center text-accent-2 hover:bg-accent-2/20 active:scale-90 transition-all"
+                          className="w-7 h-7 min-w-[44px] min-h-[44px] rounded-full bg-accent-2/10 border border-accent-2/20 flex items-center justify-center text-accent-2 hover:bg-accent-2/20 active:scale-90 transition-all"
                           title="Mark as bought"
+                          aria-label="Mark as bought"
                         >
                           <Check size={12} />
                         </button>
                         <button
                           onClick={() => openEdit(item)}
-                          className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-text hover:border-accent/30 active:scale-90 transition-all"
+                          className="w-7 h-7 min-w-[44px] min-h-[44px] rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-text hover:border-accent/30 active:scale-90 transition-all"
                           title="Edit"
+                          aria-label="Edit item"
                         >
                           <Pencil size={11} />
                         </button>
                         <button
                           onClick={() => handleRemoveFromShopping(item)}
-                          className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-text hover:border-border active:scale-90 transition-all"
+                          className="w-7 h-7 min-w-[44px] min-h-[44px] rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-text hover:border-border active:scale-90 transition-all"
                           title="Not buying / already have — keeps it in Pack"
+                          aria-label="Not buying — keep in Pack"
                         >
                           <Ban size={11} />
                         </button>
@@ -517,16 +522,18 @@ export default function SummaryScreen({
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => openCatEdit(cat)}
-                  className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-text hover:border-accent/30 active:scale-90 transition-all"
+                  className="w-7 h-7 min-w-[44px] min-h-[44px] rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-text hover:border-accent/30 active:scale-90 transition-all"
                   title="Edit category"
+                  aria-label="Edit category"
                 >
                   <Pencil size={11} />
                 </button>
                 <button
                   onClick={() => handleCatDelete(cat)}
                   disabled={isCatSaving}
-                  className="w-7 h-7 rounded-full bg-accent-3/10 border border-accent-3/20 flex items-center justify-center text-accent-3 hover:bg-accent-3/20 active:scale-90 transition-all disabled:opacity-40"
+                  className="w-7 h-7 min-w-[44px] min-h-[44px] rounded-full bg-accent-3/10 border border-accent-3/20 flex items-center justify-center text-accent-3 hover:bg-accent-3/20 active:scale-90 transition-all disabled:opacity-40"
                   title="Delete category"
+                  aria-label="Delete category"
                 >
                   <Trash2 size={11} />
                 </button>

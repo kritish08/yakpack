@@ -48,7 +48,7 @@ export default function ConfirmAddSheet({ items, reason, onConfirm, onDismiss }:
           <h2 className="font-display font-bold text-sm uppercase tracking-tight text-text">
             Add {items.length} item{items.length !== 1 ? 's' : ''} to Pack?
           </h2>
-          <button onClick={onDismiss} className="p-1.5 text-text-muted hover:text-text transition-colors">
+          <button onClick={onDismiss} aria-label="Dismiss" className="p-1.5 text-text-muted hover:text-text transition-colors">
             <X size={18} />
           </button>
         </div>

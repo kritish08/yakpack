@@ -145,7 +145,7 @@ export default function CategoryCard({ category, packed, profile, onToggle, onEd
           ) : (
             <button
               onClick={() => setShowAddForm(true)}
-              className="w-full py-2 text-xs text-text-dim hover:text-accent transition-colors flex items-center justify-center gap-1 border-t border-border/30 min-h-[40px]"
+              className="w-full py-2 text-xs text-text-dim hover:text-accent transition-colors flex items-center justify-center gap-1 border-t border-border/30 min-h-[44px]"
             >
               <Plus size={12} /> Add item
             </button>

@@ -1,7 +1,7 @@
 import { generateObject } from 'ai'
 import { unstable_cache } from 'next/cache'
 import { z } from 'zod'
-import { AI_ENABLED, getAzureModel } from '@/lib/ai'
+import { AI_ENABLED, getAzureModel, PEMBA_SYSTEM } from '@/lib/ai'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 
@@ -33,6 +33,7 @@ Fully offline days (no signal): ${offlineDays.join(', ') || 'none'}.
 Identify the top packing gaps or risks. Prioritise safety-critical items (altitude/AMS, cold, medical), offline preparation, and anything missing for high-altitude days. Be specific to what is actually missing — do not flag things already on the list. Return up to 4 gaps, most severe first. Never prescribe medication doses.`
     const { object } = await generateObject({
       model:  getAzureModel(),
+      system: PEMBA_SYSTEM,
       schema: GapSchema,
       prompt,
     })

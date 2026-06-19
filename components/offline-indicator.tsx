@@ -22,8 +22,8 @@ export default function OfflineIndicator() {
 
   return (
     <div
-      role="status"
-      className="fixed top-0 inset-x-0 z-[70] flex items-center justify-center gap-2 bg-accent-3 text-bg py-1.5 px-4"
+      role="alert"
+      className="fixed top-0 inset-x-0 z-[70] flex items-center justify-center gap-2 bg-accent-3 text-bg py-1.5 px-4 pt-[max(0.375rem,env(safe-area-inset-top))]"
     >
       <WifiOff size={13} aria-hidden="true" />
       <span className="font-mono text-[11px] uppercase tracking-wider">

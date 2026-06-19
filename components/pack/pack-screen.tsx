@@ -8,6 +8,7 @@ import EditItemSheet from './edit-item-sheet'
 import type { CategoryWithItems, Item, Packed, Profile } from '@/lib/pack'
 import type { Database } from '@/lib/database.types'
 import { deleteItem } from '@/app/actions/items'
+import { enqueueOp, flushQueue } from '@/lib/offline-queue'
 
 type PackedInsert = Database['public']['Tables']['packed']['Insert']
 
@@ -22,7 +23,7 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
   const [categories, setCategories] = useState<CategoryWithItems[]>(categoriesWithItems)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [query, setQuery] = useState('')
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   // Sync when server pushes new RSC payload after revalidatePath
   useEffect(() => { setCategories(categoriesWithItems) }, [categoriesWithItems])
@@ -35,6 +36,15 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
           const row = payload.new as Packed
           setPacked(prev => prev.some(p => p.item_id === row.item_id && p.user_key === row.user_key)
             ? prev : [...prev, row])
+        } else if (payload.eventType === 'UPDATE') {
+          const row = payload.new as Packed
+          setPacked(prev => {
+            const idx = prev.findIndex(p => p.item_id === row.item_id && p.user_key === row.user_key)
+            if (idx === -1) return [...prev, row]
+            const next = prev.slice()
+            next[idx] = row
+            return next
+          })
         } else if (payload.eventType === 'DELETE') {
           const old = payload.old as Partial<Packed>
           setPacked(prev => prev.filter(p => !(p.item_id === old.item_id && p.user_key === old.user_key)))
@@ -44,14 +54,36 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
     return () => { supabase.removeChannel(channel) }
   }, [supabase])
 
+  // Replay any offline-queued packed toggles on mount and whenever we regain
+  // connectivity. Realtime reconciles the resulting server state back into UI.
+  useEffect(() => {
+    let cancelled = false
+    const flush = () => { flushQueue(supabase).catch(() => {}) }
+    if (!cancelled) flush()
+    window.addEventListener('online', flush)
+    return () => { cancelled = true; window.removeEventListener('online', flush) }
+  }, [supabase])
+
   const handleToggle = useCallback(async (itemId: string, userKey: string, isPacked: boolean) => {
     if (isPacked) {
       setPacked(prev => prev.filter(p => !(p.item_id === itemId && p.user_key === userKey)))
-      await supabase.from('packed').delete().eq('item_id', itemId).eq('user_key', userKey)
+      try {
+        const { error } = await supabase.from('packed').delete().eq('item_id', itemId).eq('user_key', userKey)
+        if (error) throw error
+      } catch {
+        // Offline / network failure — queue the op so it isn't lost. Keep the
+        // optimistic local state; the queue replays on reconnect.
+        enqueueOp({ op: 'delete', item_id: itemId, user_key: userKey })
+      }
     } else {
       setPacked(prev => [...prev, { item_id: itemId, user_key: userKey, packed: true, packed_at: new Date().toISOString() }])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('packed') as any).insert({ item_id: itemId, user_key: userKey, packed: true } as PackedInsert)
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase.from('packed') as any).insert({ item_id: itemId, user_key: userKey, packed: true } as PackedInsert)
+        if (error) throw error
+      } catch {
+        enqueueOp({ op: 'insert', item_id: itemId, user_key: userKey })
+      }
     }
   }, [supabase])
 
@@ -170,6 +202,7 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
       </div>
       <EditItemSheet
         item={editingItem}
+        role={profile.role}
         onClose={() => setEditingItem(null)}
         onSaved={handleItemSaved}
         onDeleted={handleItemDeleted}

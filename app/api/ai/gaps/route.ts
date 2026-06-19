@@ -1,6 +1,6 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
-import { AI_ENABLED, getAzureModel } from '@/lib/ai'
+import { AI_ENABLED, getAzureModel, PEMBA_SYSTEM } from '@/lib/ai'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 
@@ -49,6 +49,7 @@ Identify the top packing gaps or risks. Focus on safety-critical items (altitude
 
   const { object } = await generateObject({
     model: getAzureModel(),
+    system: PEMBA_SYSTEM,
     schema: GapSchema,
     prompt,
   })

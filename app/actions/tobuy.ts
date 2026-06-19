@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 
 export async function markAsBought(itemId: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('items') as any)
     .update({ status: 'owned' })
@@ -21,6 +23,8 @@ export async function addToBuyItem(data: {
   assigned_to: 'kritish' | 'partner' | 'shared'
 }) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('items') as any).insert({
     category_id: data.category_id,

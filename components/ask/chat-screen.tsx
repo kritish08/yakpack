@@ -97,12 +97,16 @@ export default function ChatScreen({
       ? [{ id: 'briefing', role: 'assistant' as const, parts: [{ type: 'text' as const, text: briefing }] }]
       : []
 
-  const { messages, sendMessage, addToolResult, status } = useChat({
+  const { messages, sendMessage, addToolResult, status, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/ai/chat' }),
     messages: seedMessages,
     // After the client resolves a confirmation tool, automatically send the
     // result back so Pemba can acknowledge and continue the conversation.
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    // On a network/Azure error the SDK sets status to 'error' (which re-enables
+    // the input); we surface a visible notice so the user isn't left staring at
+    // a stuck spinner on patchy Spiti signal.
+    onError: () => {},
   })
 
   // Save conversation to parent whenever messages settle
@@ -206,7 +210,7 @@ export default function ChatScreen({
       {/* ── Messages ── */}
       <div
         className="flex-1 flex flex-col px-4 pt-4"
-        style={{ paddingBottom: NAV_H + INPUT_BAR_H + 32 }}
+        style={{ paddingBottom: `calc(${NAV_H + INPUT_BAR_H + 32}px + env(safe-area-inset-bottom))` }}
       >
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-5 py-8">
@@ -359,15 +363,30 @@ export default function ChatScreen({
               )
             })()}
 
+            {/* Error notice — Azure/network failure. Input is re-enabled (status='error'). */}
+            {status === 'error' && (
+              <div className="flex gap-2.5">
+                <div className="w-7 h-7 rounded-xl bg-accent-3/10 border border-accent-3/20 flex items-center justify-center text-sm shrink-0 mt-0.5">🐂</div>
+                <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-accent-3/10 border border-accent-3/30">
+                  <p className="font-body text-sm text-accent-3 leading-relaxed">
+                    Pemba couldn&apos;t reach the mountain network. Check your signal and try again.
+                  </p>
+                  {error?.message && (
+                    <p className="font-mono text-[10px] text-text-dim mt-1 break-all">{error.message}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div ref={bottomRef} />
           </div>
         )}
       </div>
 
-      {/* ── Input bar ── */}
+      {/* ── Input bar ── (z-[55]: above nav z-50, below sheets z-[60]) */}
       <div
-        className="fixed inset-x-0 z-40 bg-bg/95 backdrop-blur-sm border-t border-border px-3 py-2.5"
-        style={{ bottom: NAV_H, height: INPUT_BAR_H }}
+        className="fixed inset-x-0 z-[55] bg-bg/95 backdrop-blur-sm border-t border-border px-3 py-2.5"
+        style={{ bottom: `calc(${NAV_H}px + env(safe-area-inset-bottom))`, height: INPUT_BAR_H }}
       >
         <form onSubmit={handleSubmit} className="flex gap-2 items-center h-full">
           <input

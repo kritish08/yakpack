@@ -36,13 +36,19 @@ export async function POST(req: Request) {
   }).filter((m: any) => (m.parts?.length ?? 0) > 0)
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
+  // Cap conversation length: old saved chats embed full packing-list tool
+  // results, so token cost grows unbounded. Keep only the most recent ~20
+  // messages (system is passed separately, not in this array, so a tail
+  // slice is safe).
+  const trimmed = sanitized.slice(-20)
+
   const result = streamText({
     onError: (err) => {
       console.error('[chat] streamText error:', JSON.stringify(err, null, 2))
     },
     model: getAzureModel(),
     system: PEMBA_SYSTEM,
-    messages: await convertToModelMessages(sanitized),
+    messages: await convertToModelMessages(trimmed),
     stopWhen: stepCountIs(5),
     tools: {
 

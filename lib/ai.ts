@@ -22,7 +22,6 @@ export function getAzureModel() {
   const baseURL = process.env.AZURE_OPENAI_ENDPOINT ?? ''
   const deployment = process.env.AZURE_OPENAI_DEPLOYMENT ?? 'gpt-4o'
   const useResponses = process.env.AZURE_USE_RESPONSES_API === 'true'
-  console.log(`[ai] baseURL=${baseURL} deployment=${deployment} responses=${useResponses}`)
 
   const client = createOpenAI({
     baseURL,

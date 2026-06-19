@@ -77,7 +77,7 @@ export default function ConfirmActionSheet({ type, input, onConfirm, onDismiss }
               {type === 'deleteItem' ? 'Delete everywhere?' : type === 'markAsBought' ? 'Mark as bought?' : 'Update item?'}
             </h2>
           </div>
-          <button onClick={onDismiss} className="p-1.5 text-text-muted hover:text-text transition-colors">
+          <button onClick={onDismiss} aria-label="Dismiss" className="p-1.5 text-text-muted hover:text-text transition-colors">
             <X size={18} />
           </button>
         </div>

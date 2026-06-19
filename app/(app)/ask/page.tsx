@@ -1,21 +1,7 @@
 import { AI_ENABLED } from '@/lib/ai'
 import { createClient } from '@/lib/supabase/server'
+import { getBriefing } from '@/lib/briefing'
 import ChatWrapper from '@/components/ask/chat-wrapper'
-
-async function fetchBriefing(): Promise<string | null> {
-  if (!AI_ENABLED) return null
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/ai/briefing`,
-      { next: { revalidate: 3600 } }
-    )
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.briefing ?? null
-  } catch {
-    return null
-  }
-}
 
 interface AskPageProps {
   // Next.js 16: searchParams is async.
@@ -41,7 +27,7 @@ export default async function AskPage({ searchParams }: AskPageProps) {
   const supabase = await createClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [briefing, { data: firstCategoryRaw }, legRes] = await Promise.all([
-    fetchBriefing(),
+    getBriefing(),
     (supabase.from('categories') as any).select('id').order('sort_order').limit(1).single(),
     Number.isInteger(dayNum)
       ? supabase.from('itinerary').select('day, leg').eq('day', dayNum).single()

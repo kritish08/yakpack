@@ -7,6 +7,7 @@ import type { Item } from '@/lib/pack'
 
 interface EditItemSheetProps {
   item: Item | null
+  role: 'kritish' | 'partner'
   onClose: () => void
   onSaved?: (itemId: string, changes: Partial<Item>) => void
   onDeleted?: (itemId: string) => void
@@ -16,7 +17,7 @@ const inputClass =
   'bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent transition-colors w-full'
 const labelClass = 'block font-mono text-xs text-text-muted mb-1'
 
-export default function EditItemSheet({ item, onClose, onSaved, onDeleted }: EditItemSheetProps) {
+export default function EditItemSheet({ item, role, onClose, onSaved, onDeleted }: EditItemSheetProps) {
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
@@ -118,7 +119,7 @@ export default function EditItemSheet({ item, onClose, onSaved, onDeleted }: Edi
             <div className="flex rounded-lg border border-border overflow-hidden text-xs font-mono">
               <button
                 type="button"
-                onClick={() => setAssignedTo(isShared ? 'kritish' : assignedTo)}
+                onClick={() => setAssignedTo(isShared ? role : assignedTo)}
                 className={`flex-1 py-2.5 transition-colors ${!isShared ? 'bg-accent text-bg font-bold' : 'text-text-muted hover:text-text hover:bg-surface-2'}`}
               >
                 Individual

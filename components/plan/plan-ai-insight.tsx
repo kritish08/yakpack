@@ -1,6 +1,6 @@
 import { unstable_cache } from 'next/cache'
 import { generateText } from 'ai'
-import { getAzureModel, PEMBA_SYSTEM } from '@/lib/ai'
+import { AI_ENABLED, getAzureModel, PEMBA_SYSTEM } from '@/lib/ai'
 import type { Leg, LegWeather } from '@/lib/plan'
 
 const generateInsight = unstable_cache(
@@ -26,6 +26,8 @@ interface Props {
 }
 
 export default async function PlanAiInsight({ leg, weather }: Props) {
+  if (!AI_ENABLED) return null
+
   const weatherSummary = weather
     ? `Weather: ${weather.temp_min}–${weather.temp_max}°C, rain ${weather.rain_pct}%, UV ${weather.uv}`
     : 'Weather data unavailable'

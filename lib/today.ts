@@ -5,6 +5,7 @@ import type { WeatherData } from '@/lib/weather'
 
 export type Leg = Database['public']['Tables']['itinerary']['Row']
 export type Item = Database['public']['Tables']['items']['Row']
+type Profile = Database['public']['Tables']['profiles']['Row']
 
 export async function getTodayData() {
   const cookieStore = await cookies()
@@ -23,13 +24,21 @@ export async function getTodayData() {
     supabase.from('itinerary').select('*').order('day'),
     supabase.from('items').select('*'),
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('packed').select('item_id'),
+    supabase.from('packed').select('item_id, user_key'),
   ])
 
   const legs    = (legsRes.data    ?? []) as Leg[]
   const items   = (itemsRes.data   ?? []) as Item[]
-  const profile = profileRes.data!
-  const packedIds = new Set((packedRes.data ?? []).map((r: { item_id: string }) => r.item_id))
+  const profile = profileRes.data! as Profile
+  // Only count items packed from the current user's perspective: their own
+  // per-person rows plus shared rows. Without this filter, an item shows as
+  // packed if EITHER user packed it.
+  const myKeys = new Set<string>([profile.role, 'shared'])
+  const packedIds = new Set(
+    (packedRes.data ?? [])
+      .filter((r: { user_key: string }) => myKeys.has(r.user_key))
+      .map((r: { item_id: string }) => r.item_id)
+  )
 
   // Find today's leg; if before trip show Day 1 preview; if after trip show last day
   const todayLeg: Leg | undefined =

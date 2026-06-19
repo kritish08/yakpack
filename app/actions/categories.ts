@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 
 export async function addCategory(data: { name: string; icon?: string }) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: maxRes } = await (supabase as any)
     .from('categories')
@@ -27,6 +29,8 @@ export async function addCategory(data: { name: string; icon?: string }) {
 
 export async function updateCategory(id: number, data: { name?: string; icon?: string | null }) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
   const payload = {
     ...(data.name !== undefined ? { name: data.name.trim() } : {}),
     ...(data.icon !== undefined ? { icon: data.icon?.trim() || null } : {}),
@@ -40,6 +44,8 @@ export async function updateCategory(id: number, data: { name?: string; icon?: s
 
 export async function deleteCategory(id: number): Promise<void> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
   const { count } = await supabase
     .from('items')
     .select('id', { count: 'exact', head: true })
