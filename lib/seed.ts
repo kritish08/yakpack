@@ -57,7 +57,6 @@ interface ItineraryInsert {
 }
 
 interface TripInsert {
-  id: number
   name: string
   depart_date: string
   // Contact fields are nullable: they hold third-party details supplied via env
@@ -171,7 +170,6 @@ export function parsePackingList(content: string): {
   // committed to a public repo. Absent env vars simply leave the fields null and
   // the Settings screen hides the corresponding `tel:` link.
   const trip: TripInsert = {
-    id: 1,
     name: process.env.TRIP_NAME
       ?? 'Experience Spiti Valley (Ex-Delhi) — Kinnaur · Spiti · Chandratal',
     depart_date: process.env.TRIP_DEPART_DATE ?? '2026-06-19',
@@ -356,7 +354,7 @@ async function main() {
   console.log(`Items:          ${items.length}`)
   console.log(`Packed rows:    ${packedCount}`)
   console.log(`Itinerary days: ${itineraryRows.length}`)
-  console.log(`Trip row:       1 (id=1)`)
+  console.log(`Template trip:  1`)
   console.log()
 
   if (isDryRun) {
@@ -499,9 +497,11 @@ async function main() {
   console.log(`Inserting ${packedCount} packed rows...`)
   const packedRows: Array<{ item_id: string; user_key: string; packed: boolean }> = []
   for (const inserted of insertedItems ?? []) {
+    // Only the organiser slot. The template's packed rows are never copied —
+    // create_trip_from_template() generates fresh ones per trip — and a partner
+    // slot has no holder here, so pre-creating one is meaningless.
     if (inserted.scope === 'each') {
       packedRows.push({ item_id: inserted.id, user_key: 'organiser', packed: false })
-      packedRows.push({ item_id: inserted.id, user_key: 'partner', packed: false })
     } else {
       packedRows.push({ item_id: inserted.id, user_key: 'shared', packed: false })
     }

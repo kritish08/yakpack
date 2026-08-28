@@ -50,18 +50,40 @@ needed it.
 Next.js 16 (App Router, React 19) · Supabase (Postgres, Auth, Realtime) ·
 Tailwind v4 · Vercel AI SDK with OpenAI · Open-Meteo · a hand-written service worker
 
-## Running it yourself
+## Running it locally
+
+Everything runs on your machine — Postgres, Auth, Realtime and a mail catcher —
+so you never need a hosted project to develop against. Requires Docker.
 
 ```bash
 pnpm install
-cp .env.example .env.local     # fill in your Supabase project
-supabase db push               # apply migrations
-pnpm seed                      # build the template trip from /docs
-pnpm dev
+pnpm db:start                              # local Supabase; applies all migrations
+cp .env.supabase.example .env.local.supabase
+pnpm seed:local                            # build the template trip from /docs
+pnpm dev:local                             # http://localhost:3000
 ```
 
-Registration copies the **template trip** into each new account, so run `pnpm seed`
-once before anyone signs up or new accounts land in an empty app.
+The first account you register becomes the **admin**. Registration copies the
+**template trip**, so run the seed before signing up or the account lands in an
+empty app.
+
+| Where | URL |
+|---|---|
+| App | http://localhost:3000 |
+| Supabase Studio (browse the data) | http://127.0.0.1:54323 |
+| Mailpit (confirmation + reset emails) | http://127.0.0.1:54324 |
+
+`pnpm db:reset` wipes the local database and replays every migration from scratch —
+the fastest way to check a migration works on a clean install. `pnpm db:stop` shuts
+the stack down.
+
+### Deploying
+
+```bash
+cp .env.example .env.local     # your hosted Supabase project
+supabase db push               # apply migrations
+pnpm seed                      # template trip, against production
+```
 
 | Command | Does |
 |---|---|

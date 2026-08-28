@@ -8,7 +8,13 @@
     "start": "next start",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
-    "seed": "tsx lib/seed.ts"
+    "seed": "tsx lib/seed.ts",
+    "db:start": "supabase start -x edge-runtime,imgproxy,vector,supavisor",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:studio": "open http://127.0.0.1:54323",
+    "dev:local": "dotenv -e .env.local.supabase -- next dev --turbopack",
+    "seed:local": "dotenv -e .env.local.supabase -- tsx lib/seed.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -50,6 +56,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
     "shadcn": "^4.11.0",
+    "supabase": "^2.116.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
     "typescript": "^5"

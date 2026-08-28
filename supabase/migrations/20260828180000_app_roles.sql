@@ -66,9 +66,15 @@ create policy "profiles: admin read" on public.profiles for select
 
 -- ── Bootstrap ────────────────────────────────────────────────────────────────
 --
--- The earliest account becomes the admin when none exists yet. On a fresh
--- self-hosted install that is whoever set it up; here it is the original owner.
--- Deliberately not a hardcoded UUID, so this works on any deployment.
+-- Two paths, because they are genuinely different situations:
+--
+--   1. Upgrading an install that already has accounts — promote the earliest one.
+--   2. A fresh install, where `profiles` is empty when this runs. The update
+--      below would match nothing and the deployment would have NO admin, ever.
+--      So handle_new_user() promotes the first account to sign up instead.
+--
+-- Deliberately no hardcoded UUID, so this works on any deployment.
+
 do $$
 begin
   if not exists (select 1 from public.profiles where app_role = 'admin') then
@@ -77,6 +83,30 @@ begin
      where id = (select id from public.profiles order by created_at, id limit 1);
   end if;
 end $$;
+
+-- First account to register on an empty install becomes the operator.
+-- Two simultaneous first signups could both be promoted; on a self-hosted
+-- install that is the same person twice, and a second admin is not a privilege
+-- escalation — so this is not worth serialising a signup over.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.profiles (id, display_name, color, app_role)
+  values (
+    new.id,
+    coalesce(new.raw_app_meta_data->>'display_name',
+             new.raw_user_meta_data->>'display_name',
+             split_part(new.email, '@', 1)),
+    coalesce(new.raw_app_meta_data->>'color', 'accent'),
+    case
+      when exists (select 1 from public.profiles where app_role = 'admin') then 'user'
+      else 'admin'
+    end
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
 
 -- Installed last: the guard would otherwise block the bootstrap update above.
 drop trigger if exists profiles_prevent_app_role_change on public.profiles;
