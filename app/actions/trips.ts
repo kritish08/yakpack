@@ -2,10 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { getTripContext, listTrips, type TripSummary } from '@/lib/trip'
+import { getTripContext, listTrips } from '@/lib/trip'
+import type { TripSummary } from '@/lib/database.types'
 import { sanitizeText } from '@/lib/sanitize'
 
-export type { TripSummary }
+// Deliberately no `export type` here. A 'use server' module may export only
+// async functions: the server-actions loader turns every export into a runtime
+// binding, so a re-exported type becomes a ReferenceError at module evaluation
+// and takes every action in the file down with it.
 
 export async function getTrips(): Promise<TripSummary[]> {
   return listTrips()

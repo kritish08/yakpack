@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, ChevronDown, Loader2, Plus, Users } from 'lucide-react'
-import { createTrip, switchTrip, type TripSummary } from '@/app/actions/trips'
+import { createTrip, switchTrip } from '@/app/actions/trips'
+import type { TripSummary } from '@/lib/database.types'
 
 /**
  * Current trip, and a way to change it.

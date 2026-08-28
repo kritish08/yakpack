@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Database, MemberKey, TripMemberView } from '@/lib/database.types'
+import type { Database, MemberKey, TripMemberView, TripSummary } from '@/lib/database.types'
 
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Trip = Database['public']['Tables']['trips']['Row']
@@ -142,15 +142,6 @@ export async function ensureTripContext(): Promise<TripContext> {
   if (error) throw new Error(error.message)
 
   return getTripContext()
-}
-
-export interface TripSummary {
-  id: string
-  name: string
-  memberKey: MemberKey
-  isCurrent: boolean
-  memberCount: number
-  legCount: number
 }
 
 /**

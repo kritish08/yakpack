@@ -33,6 +33,16 @@ export type NetworkQuality = 'good' | 'weak' | 'none' | 'patchy'
  */
 export type AppRole = 'admin' | 'user'
 
+/** One trip in the switcher. */
+export interface TripSummary {
+  id: string
+  name: string
+  memberKey: MemberKey
+  isCurrent: boolean
+  memberCount: number
+  legCount: number
+}
+
 /** One person in the trip, as the UI needs them. */
 export interface TripMemberView {
   memberKey: MemberKey
