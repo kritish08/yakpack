@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'YakPack — Spiti 2026',
+    name: 'YakPack',
     short_name: 'YakPack',
-    description: 'Two-person Spiti trip companion. Haul it like a yak.',
+    description: 'Packing and plans for trips that lose signal. Haul it like a yak.',
     start_url: '/',
     display: 'standalone',
     background_color: '#0f0e0c',

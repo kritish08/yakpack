@@ -18,12 +18,19 @@ export default function ResetPasswordPage() {
     if (password !== confirm) { setError('Passwords do not match.'); return }
     setLoading(true)
     setError(null)
-    const { error: err } = await supabase.auth.updateUser({ password })
-    if (err) {
-      setError(err.message)
+    // Rejects outright when the network is unreachable; without this the button
+    // stays disabled and the user has no idea what happened.
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password })
+      if (err) {
+        setError(err.message)
+        setLoading(false)
+      } else {
+        router.push('/app')
+      }
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.')
       setLoading(false)
-    } else {
-      router.push('/app')
     }
   }
 

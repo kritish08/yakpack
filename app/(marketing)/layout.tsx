@@ -4,9 +4,9 @@ import SiteNav from '@/components/landing/site-nav'
 import Reveal from '@/components/landing/reveal'
 
 export const metadata: Metadata = {
-  title: 'YakPack — a packing companion for the Spiti Valley',
+  title: 'YakPack — packing and plans for trips that lose signal',
   description:
-    'An offline-first trip companion for two people crossing the Spiti Valley: weather-aware packing, a nine-day plan, and an AI guide you bring your own key for.',
+    'An offline-first packing and itinerary companion. Weather-aware lists, a shared plan for everyone travelling with you, and an AI guide you bring your own key for.',
 }
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {

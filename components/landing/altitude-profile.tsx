@@ -52,7 +52,15 @@ const area = `${line} L${W},${H} L0,${H} Z`
 const peakIdx = LEGS.reduce((best, l, i) => (l.altitude > LEGS[best].altitude ? i : best), 0)
 const darkIdx = LEGS.findIndex(l => l.network === 'none')
 
-export default function AltitudeProfile({ className = '' }: { className?: string }) {
+/**
+ * `onDark` renders the labels light-on-dark for the photographic hero, where the
+ * theme's own text colours would be dark-on-dark in light mode.
+ */
+export default function AltitudeProfile(
+  { className = '', onDark = false }: { className?: string; onDark?: boolean },
+) {
+  const gridStroke = onDark ? 'rgba(255,255,255,0.22)' : 'var(--border-strong)'
+  const dotFill    = onDark ? '#0f0e0c' : 'var(--bg)'
   return (
     <figure className={className}>
       <figcaption className="sr-only">
@@ -75,7 +83,7 @@ export default function AltitudeProfile({ className = '' }: { className?: string
         {/* 4,000 m — the line above which the app force-promotes cold-weather kit */}
         <line
           x1="0" x2={W} y1={y(4000)} y2={y(4000)}
-          stroke="var(--border-strong)" strokeWidth="1" strokeDasharray="4 6" vectorEffect="non-scaling-stroke"
+          stroke={gridStroke} strokeWidth="1" strokeDasharray="4 6" vectorEffect="non-scaling-stroke"
         />
 
         <path d={area} fill="url(#alt-fill)" className="yp-profile-area" />
@@ -96,7 +104,7 @@ export default function AltitudeProfile({ className = '' }: { className?: string
             cx={px}
             cy={py}
             r={i === peakIdx || i === darkIdx ? 5 : 3}
-            fill={i === darkIdx ? 'var(--accent-3)' : i === peakIdx ? 'var(--accent)' : 'var(--bg)'}
+            fill={i === darkIdx ? 'var(--accent-3)' : i === peakIdx ? 'var(--accent)' : dotFill}
             stroke={i === darkIdx ? 'var(--accent-3)' : 'var(--accent)'}
             strokeWidth="2"
             vectorEffect="non-scaling-stroke"
@@ -107,10 +115,10 @@ export default function AltitudeProfile({ className = '' }: { className?: string
       </svg>
 
       {/* Day scale — the ticks carry the actual altitudes, so the axis is the content */}
-      <ol className="mt-3 grid grid-cols-9 gap-0.5 font-mono text-[9px] sm:text-[10px] text-text-dim">
+      <ol className={`mt-3 grid grid-cols-9 gap-0.5 font-mono text-[9px] sm:text-[10px] ${onDark ? 'text-white/45' : 'text-text-dim'}`}>
         {LEGS.map(l => (
           <li key={l.day} className="text-center leading-tight">
-            <span className="block text-text-muted">D{l.day}</span>
+            <span className={`block ${onDark ? 'text-white/70' : 'text-text-muted'}`}>D{l.day}</span>
             <span className={l.network === 'none' ? 'text-accent-3' : ''}>
               {l.altitude.toLocaleString()}
             </span>

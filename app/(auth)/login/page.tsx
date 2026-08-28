@@ -32,27 +32,31 @@ function LoginPageForm() {
     setLoading(true)
     setError(null)
 
-    if (mode === 'forgot') {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin
-      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${siteUrl}/api/auth/callback?next=/reset-password`,
-      })
+    // These calls reject outright when the network is unreachable — checking the
+    // returned `error` alone leaves the button stuck on "Signing in…" forever.
+    try {
+      if (mode === 'forgot') {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin
+        const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${siteUrl}/api/auth/callback?next=/reset-password`,
+        })
+        if (err) setError(err.message)
+        else setResetSent(true)
+        setLoading(false)
+        return
+      }
+
+      const { error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) {
         setError(err.message)
+        setLoading(false)
       } else {
-        setResetSent(true)
+        router.push(destination)
+        router.refresh()
       }
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.')
       setLoading(false)
-      return
-    }
-
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
-    if (err) {
-      setError(err.message)
-      setLoading(false)
-    } else {
-      router.push(destination)
-      router.refresh()
     }
   }
 

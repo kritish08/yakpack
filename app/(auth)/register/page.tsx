@@ -58,14 +58,22 @@ function RegisterPageForm() {
     setLoading(true)
     setError(null)
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { display_name: displayName.trim() || email.split('@')[0] } },
-    })
-
-    if (signUpError) {
-      setError(signUpError.message)
+    let data
+    try {
+      const res = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { display_name: displayName.trim() || email.split('@')[0] } },
+      })
+      if (res.error) {
+        setError(res.error.message)
+        setLoading(false)
+        return
+      }
+      data = res.data
+    } catch {
+      // signUp rejects when the network is unreachable, not just on a bad request.
+      setError('Could not reach the server. Check your connection and try again.')
       setLoading(false)
       return
     }

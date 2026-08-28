@@ -11,11 +11,11 @@ const FEATURES = [
     data: 'temp_min < 5 °C  ·  altitude > 4,000 m  →  cold',
   },
   {
-    label: 'Two people',
-    title: 'Shared items only get packed once',
+    label: 'Your people',
+    title: 'Shared kit only gets packed once',
     body:
-      'Each item is yours, theirs, or shared. Personal items track a separate packed state per person; shared items track one. Check something off on your phone and it lands on the other in under a second.',
-    data: 'scope: each  →  2 rows   ·   scope: shared  →  1 row',
+      'Invite up to two others by link. Every item belongs to one person or to everyone: personal items track a packed state each, shared items track one between you. Check something off and it lands on their phone in under a second.',
+    data: 'organiser  +  partner_1  +  partner_2',
   },
   {
     label: 'Offline',
@@ -46,33 +46,35 @@ export default function LandingPage() {
           sizes="100vw"
           className="object-cover"
         />
-        {/* Two stops rather than one: the lower band has to carry body text, the
-            upper only has to keep the fixed nav legible. */}
-        <div className="absolute inset-0 bg-gradient-to-b from-bg/85 via-bg/35 to-bg" />
-        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-bg to-transparent" />
+        {/* Fixed dark scrim rather than theme tokens. In light mode a cream wash
+            over a bright photograph left the body copy unreadable; a photographic
+            hero wants light-on-dark in both themes, so the colours here are
+            deliberately not token-driven. */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/45 to-black/85" />
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/70 to-transparent" />
 
         <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-8 pb-12 sm:pb-16 pt-28">
           <p
             className="yp-hero-line font-mono text-[10px] sm:text-xs uppercase tracking-[0.24em] text-accent"
             style={{ animationDelay: '0.05s' }}
           >
-            9 days · 216 m → 4,590 m · two of them with no signal
+            Packing · plan · weather · works with no signal
           </p>
 
           <h1
-            className="yp-hero-line font-display font-extrabold uppercase tracking-[-0.04em] text-text mt-4 leading-[0.88] text-[clamp(2.75rem,11vw,7rem)]"
+            className="yp-hero-line font-display font-extrabold uppercase tracking-[-0.04em] text-white mt-4 leading-[0.88] text-[clamp(2.75rem,11vw,7rem)] drop-shadow-[0_2px_20px_rgba(0,0,0,0.5)]"
             style={{ animationDelay: '0.15s' }}
           >
             Haul it like<br />a yak.
           </h1>
 
           <p
-            className="yp-hero-line font-body text-base sm:text-lg text-text-muted mt-6 max-w-xl leading-relaxed"
+            className="yp-hero-line font-body text-base sm:text-lg text-white/85 mt-6 max-w-xl leading-relaxed"
             style={{ animationDelay: '0.25s' }}
           >
-            A packing and itinerary companion for two people crossing the Spiti Valley.
-            It knows the altitude, watches the forecast, and keeps working when the
-            mountains take your signal away.
+            A packing and itinerary companion for you and whoever you travel with.
+            It watches the forecast, knows how high you are going, and keeps working
+            when the signal doesn&apos;t.
           </p>
 
           <div
@@ -89,21 +91,33 @@ export default function LandingPage() {
               href="https://github.com/kritish08/yakpack"
               target="_blank"
               rel="noreferrer noopener"
-              className="font-mono text-sm text-text-muted hover:text-text border border-border hover:border-border-strong px-5 py-3.5 rounded-xl transition-colors min-h-[44px] flex items-center"
+              className="font-mono text-sm text-white/70 hover:text-white border border-white/25 hover:border-white/50 px-5 py-3.5 rounded-xl transition-colors min-h-[44px] flex items-center"
             >
               Read the source
             </a>
           </div>
 
           <div className="mt-12 sm:mt-16">
-            <AltitudeProfile />
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45 mb-3">
+              The trip it was built for
+            </p>
+            <AltitudeProfile onDark />
           </div>
         </div>
       </section>
 
       {/* ── The trip ─────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-5 sm:px-8 pt-24 sm:pt-32">
-        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16 items-start">
+      <section className="relative overflow-hidden pt-24 sm:pt-32">
+        {/* The place name as a ground layer rather than a heading: it belongs to
+            the story, not to the product, which is why it sits behind the type. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none select-none absolute -top-2 sm:-top-6 left-0 right-0 text-center font-display font-extrabold uppercase leading-[0.8] tracking-[-0.05em] text-[clamp(7rem,26vw,22rem)] text-text opacity-[0.06]"
+        >
+          Spiti
+        </span>
+
+        <div className="relative mx-auto max-w-6xl px-5 sm:px-8 grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16 items-start">
           <div data-reveal>
             <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
               Why it exists
@@ -181,14 +195,12 @@ export default function LandingPage() {
       <section className="mx-auto max-w-6xl px-5 sm:px-8 pt-24 sm:pt-32">
         <div data-reveal className="rounded-2xl border border-accent/25 bg-accent/[0.04] overflow-hidden">
           <div className="grid md:grid-cols-[auto_1fr] gap-6 md:gap-10 p-6 sm:p-10 items-start">
-            <div className="relative w-20 h-20 sm:w-28 sm:h-28 shrink-0 mx-auto md:mx-0">
-              <Image
-                src="/landing/pemba-yak.webp"
-                alt=""
-                fill
-                sizes="112px"
-                className="object-contain"
-              />
+            {/* An emoji rather than artwork: the illustration carried a baked-in
+                dark background that rendered as a black tile in light mode. */}
+            <div className="shrink-0 mx-auto md:mx-0 w-20 h-20 sm:w-24 sm:h-24 rounded-[1.4rem] bg-gradient-to-br from-accent/20 to-accent/5 border border-accent/25 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <span role="img" aria-label="Pemba the yak" className="text-4xl sm:text-5xl leading-none select-none">
+                🐂
+              </span>
             </div>
 
             <div>

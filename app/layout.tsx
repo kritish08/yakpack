@@ -27,7 +27,7 @@ const dmMono = DM_Mono({
 
 export const metadata: Metadata = {
   title: 'YakPack',
-  description: 'Two-person Spiti trip companion. Haul it like a yak.',
+  description: 'Packing and plans for trips that lose signal. Haul it like a yak.',
   icons: {
     icon: [
       { url: '/icons/icon.svg', type: 'image/svg+xml' },
