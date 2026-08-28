@@ -67,6 +67,7 @@ export type Database = {
           display_name: string
           color: string
           app_role: AppRole
+          current_trip_id: string | null
           created_at: string
         }
         Insert: {
@@ -74,6 +75,7 @@ export type Database = {
           display_name: string
           color?: string
           app_role?: AppRole
+          current_trip_id?: string | null
           created_at?: string
         }
         Update: {
@@ -81,6 +83,7 @@ export type Database = {
           display_name?: string
           color?: string
           app_role?: AppRole
+          current_trip_id?: string | null
           created_at?: string
         }
       }

@@ -42,24 +42,27 @@ export async function getTripContext(): Promise<TripContext> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { data: rawMemberships } = await supabase
-    .from('trip_members')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at')
-  const memberships = (rawMemberships ?? []) as TripMember[]
-
-  // The trip they organise wins; otherwise the oldest trip they were invited to.
-  const mine = memberships.find(m => m.member_key === 'organiser') ?? memberships[0]
-  if (!mine) throw new Error('NO_TRIP')
-
-  const [profileRes, tripRes, membersRes] = await Promise.all([
+  const [profileRes, membershipsRes] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('trips').select('*').eq('id', mine.trip_id).single(),
-    supabase.from('trip_members').select('*').eq('trip_id', mine.trip_id),
+    supabase.from('trip_members').select('*').eq('user_id', user.id).order('created_at'),
   ])
 
   const profile = profileRes.data as Profile | null
+  const memberships = (membershipsRes.data ?? []) as TripMember[]
+
+  // Their explicit selection wins. Falling back to a trip they organise, then to
+  // the oldest they were invited to, keeps a stale or cleared selection — a
+  // deleted trip sets the column to NULL — from dead-ending the app.
+  const mine =
+    memberships.find(m => m.trip_id === profile?.current_trip_id) ??
+    memberships.find(m => m.member_key === 'organiser') ??
+    memberships[0]
+  if (!mine) throw new Error('NO_TRIP')
+
+  const [tripRes, membersRes] = await Promise.all([
+    supabase.from('trips').select('*').eq('id', mine.trip_id).single(),
+    supabase.from('trip_members').select('*').eq('trip_id', mine.trip_id),
+  ])
   const trip = tripRes.data as Trip | null
   const members = (membersRes.data ?? []) as TripMember[]
   if (!trip) throw new Error('NO_TRIP')
@@ -81,7 +84,7 @@ export async function getTripContext(): Promise<TripContext> {
     userId: user.id,
     tripId: mine.trip_id,
     memberKey: mine.member_key,
-    profile: profile ?? { id: user.id, display_name: 'You', color: 'accent', app_role: 'user', created_at: '' },
+    profile: profile ?? { id: user.id, display_name: 'You', color: 'accent', app_role: 'user', current_trip_id: null, created_at: '' },
     trip,
     rows: members,
     members: view,
@@ -139,4 +142,62 @@ export async function ensureTripContext(): Promise<TripContext> {
   if (error) throw new Error(error.message)
 
   return getTripContext()
+}
+
+export interface TripSummary {
+  id: string
+  name: string
+  memberKey: MemberKey
+  isCurrent: boolean
+  memberCount: number
+  legCount: number
+}
+
+/**
+ * Every trip the signed-in user belongs to, for the switcher.
+ *
+ * Counts come from two grouped reads rather than a per-trip query, so adding a
+ * twentieth trip does not mean twenty round-trips.
+ */
+export async function listTrips(): Promise<TripSummary[]> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const [profileRes, mineRes] = await Promise.all([
+    supabase.from('profiles').select('current_trip_id').eq('id', user.id).single(),
+    supabase.from('trip_members').select('trip_id, member_key').eq('user_id', user.id).order('created_at'),
+  ])
+
+  const currentId = (profileRes.data as { current_trip_id: string | null } | null)?.current_trip_id
+  const mine = (mineRes.data ?? []) as { trip_id: string; member_key: MemberKey }[]
+  if (mine.length === 0) return []
+
+  const ids = mine.map(m => m.trip_id)
+  const [tripsRes, membersRes, legsRes] = await Promise.all([
+    supabase.from('trips').select('id, name').in('id', ids),
+    supabase.from('trip_members').select('trip_id').in('trip_id', ids),
+    supabase.from('itinerary').select('trip_id').in('trip_id', ids),
+  ])
+
+  const names = new Map(((tripsRes.data ?? []) as { id: string; name: string }[]).map(t => [t.id, t.name]))
+  const tally = (rows: unknown) => {
+    const m = new Map<string, number>()
+    for (const r of (rows ?? []) as { trip_id: string }[]) m.set(r.trip_id, (m.get(r.trip_id) ?? 0) + 1)
+    return m
+  }
+  const memberCounts = tally(membersRes.data)
+  const legCounts = tally(legsRes.data)
+
+  return mine
+    .filter(m => names.has(m.trip_id))
+    .map(m => ({
+      id: m.trip_id,
+      name: names.get(m.trip_id)!,
+      memberKey: m.member_key,
+      isCurrent: m.trip_id === currentId,
+      memberCount: memberCounts.get(m.trip_id) ?? 1,
+      legCount: legCounts.get(m.trip_id) ?? 0,
+    }))
 }

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Settings } from 'lucide-react'
 import { AI_ENABLED } from '@/lib/ai'
-import { ensureTripContext } from '@/lib/trip'
+import { ensureTripContext, listTrips } from '@/lib/trip'
+import TripSwitcher from '@/components/app/trip-switcher'
 import ThemeToggle from '@/components/theme-toggle'
 import PageTransition from '@/components/page-transition'
 import OfflineIndicator from '@/components/offline-indicator'
@@ -11,7 +12,8 @@ import BottomNav from '@/components/bottom-nav'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // A user can arrive authenticated but trip-less when signup and email
   // confirmation are separated. Fill that gap here rather than dead-ending them.
-  await ensureTripContext()
+  const ctx = await ensureTripContext()
+  const trips = await listTrips()
 
   return (
     <div className="flex flex-col min-h-screen bg-bg">
@@ -19,9 +21,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <OfflineSync />
       {/* Top bar */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <span className="font-display font-bold text-xl uppercase tracking-tight text-text">
-          YakPack
-        </span>
+        <div className="min-w-0 flex flex-col">
+          <span className="font-display font-bold text-lg uppercase tracking-tight text-text leading-none">
+            YakPack
+          </span>
+          <TripSwitcher trips={trips} currentName={ctx.trip.name} />
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-2xl" aria-label="Pemba the yak">🐂</span>
           <Link
