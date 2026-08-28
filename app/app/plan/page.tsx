@@ -41,6 +41,7 @@ export default async function PlanPage() {
       {...data}
       weatherMap={weatherMap}
       aiEnabled={AI_ENABLED}
+      isOrganiser={data.ctx.isOrganiser}
     />
   )
 }

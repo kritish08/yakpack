@@ -5,18 +5,20 @@ import type { Leg, Trip, LegWeather } from '@/lib/plan'
 import type { MemberView } from '@/lib/database.types'
 import { amsRisk } from '@/lib/ams'
 import DayCard from './day-card'
+import ImportPlan from './import-plan'
 
 interface PlanScreenProps {
   legs:            Leg[]
   trip:            Trip | null
   ctx:             MemberView
+  isOrganiser?:    boolean
   today:           string
   weatherMap?:     Record<number, LegWeather | null>
   todayInsightNode?: ReactNode
   aiEnabled?:      boolean
 }
 
-export default function PlanScreen({ legs, trip, today, weatherMap, todayInsightNode, aiEnabled }: PlanScreenProps) {
+export default function PlanScreen({ legs, trip, today, weatherMap, todayInsightNode, aiEnabled, isOrganiser }: PlanScreenProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const stripRef = useRef<HTMLDivElement>(null)
   const todayIndex = legs.findIndex(l => l.date === today)
@@ -52,6 +54,28 @@ export default function PlanScreen({ legs, trip, today, weatherMap, todayInsight
     cardRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  if (legs.length === 0) {
+    return (
+      <div className="h-full overflow-y-auto pb-20 px-4 pt-5">
+        <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text leading-none">
+          {trip?.name ?? 'Your trip'}
+        </h1>
+        <div className="mt-10 flex flex-col items-center text-center gap-4 py-10">
+          <span className="text-5xl" aria-hidden="true">🗺️</span>
+          <p className="font-display font-bold text-base uppercase tracking-tight text-text">
+            This trip has no days yet
+          </p>
+          <p className="font-body text-sm text-text-muted max-w-xs leading-relaxed">
+            {isOrganiser
+              ? 'Paste an itinerary and it will be read into days. Anything it cannot work out is left blank rather than guessed.'
+              : 'The organiser has not added the plan yet.'}
+          </p>
+          {isOrganiser && <ImportPlan hasPlan={false} />}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full overflow-y-auto pb-20">
       {/* Header */}
@@ -62,7 +86,7 @@ export default function PlanScreen({ legs, trip, today, weatherMap, todayInsight
               {trip?.name ?? 'Spiti Valley'}
             </h1>
             <p className="font-mono text-xs text-text-muted mt-1">
-              {legs.length} days · {trip?.name ?? 'Your trip'}
+              {legs.length === 0 ? 'No plan yet' : `${legs.length} day${legs.length === 1 ? '' : 's'}`}
             </p>
           </div>
           {tripEnded ? (
