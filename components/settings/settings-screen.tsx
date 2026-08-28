@@ -4,18 +4,23 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil, X, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Database } from '@/lib/database.types'
+import ByokSection from './byok-section'
+import AdminPanel from './admin-panel'
+import PartnersSection from './partners-section'
+import type { AppRole, Database, MemberKey } from '@/lib/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 
 interface Props {
   profile: Profile | null
   userEmail: string
+  memberKey: MemberKey
+  appRole: AppRole
 }
 
 // --- Profile Card ---
 
-function ProfileCard({ profile, userEmail }: { profile: Profile | null; userEmail: string }) {
+function ProfileCard({ profile, userEmail, memberKey }: { profile: Profile | null; userEmail: string; memberKey: MemberKey }) {
   const [editing, setEditing] = useState(false)
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
   const [draftName, setDraftName] = useState(displayName)
@@ -23,12 +28,12 @@ function ProfileCard({ profile, userEmail }: { profile: Profile | null; userEmai
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  const role = profile?.role ?? 'partner'
-  const isKritish = role === 'kritish'
-  const initial = displayName ? displayName[0].toUpperCase() : (isKritish ? 'K' : 'G')
-  const avatarColor = isKritish ? 'bg-accent/20 text-accent' : 'bg-accent-4/20 text-accent-4'
-  const roleBadgeColor = isKritish ? 'text-accent bg-accent/10' : 'text-accent-4 bg-accent-4/10'
-  const roleName = isKritish ? 'Kritish' : 'Partner'
+  // Identity is per-trip: you own your own trip and may be the partner on another.
+  const isOwner = memberKey === 'organiser'
+  const initial = displayName ? displayName[0].toUpperCase() : (isOwner ? 'O' : 'P')
+  const avatarColor = isOwner ? 'bg-accent/20 text-accent' : 'bg-accent-4/20 text-accent-4'
+  const roleBadgeColor = isOwner ? 'text-accent bg-accent/10' : 'text-accent-4 bg-accent-4/10'
+  const roleName = isOwner ? 'Trip organiser' : 'Partner'
 
   async function handleSave() {
     const trimmed = draftName.trim()
@@ -233,7 +238,7 @@ function PreferencesSection() {
 
 // --- Main ---
 
-export default function SettingsScreen({ profile, userEmail }: Props) {
+export default function SettingsScreen({ profile, userEmail, memberKey, appRole }: Props) {
   const router = useRouter()
 
   async function handleSignOut() {
@@ -244,8 +249,11 @@ export default function SettingsScreen({ profile, userEmail }: Props) {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
-      <ProfileCard profile={profile} userEmail={userEmail} />
+      <ProfileCard profile={profile} userEmail={userEmail} memberKey={memberKey} />
       <PasswordSection />
+      <PartnersSection />
+      <ByokSection isAdmin={appRole === 'admin'} />
+      {appRole === 'admin' && <AdminPanel />}
       <PreferencesSection />
       <section>
         <button

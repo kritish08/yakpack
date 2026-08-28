@@ -4,7 +4,7 @@ const isDev = process.env.NODE_ENV === 'development'
 
 // Content-Security-Policy.
 // The browser only ever talks to: our own origin, Supabase (REST + realtime
-// websockets), and Vercel analytics. Azure (AI/voice) and Open-Meteo are called
+// websockets), and Vercel analytics. OpenAI and Open-Meteo are called
 // server-side only, so they are NOT in connect-src.
 // Next.js App Router injects inline scripts/styles for hydration & streaming, so
 // 'unsafe-inline' is required without a nonce pipeline. 'unsafe-eval' is only
@@ -31,9 +31,9 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // Disable powerful features the app doesn't use. microphone left to 'self'
-  // for the optional M9 voice layer.
-  { key: 'Permissions-Policy', value: 'camera=(), geolocation=(), browsing-topics=(), microphone=(self)' },
+  // Disable powerful features the app doesn't use. The M9 voice layer was
+  // never built, so the microphone stays closed too.
+  { key: 'Permissions-Policy', value: 'camera=(), geolocation=(), browsing-topics=(), microphone=()' },
 ]
 
 const nextConfig: NextConfig = {

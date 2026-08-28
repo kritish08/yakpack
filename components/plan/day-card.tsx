@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import type { Leg, LegWeather } from '@/lib/plan'
 import type { AmsRisk } from '@/lib/ams'
+import { byokHeaders } from '@/lib/byok'
 
 const networkLabel: Record<string, { label: string; cls: string }> = {
   good:   { label: '4G',        cls: 'text-accent-2 bg-accent-2/10 border-accent-2/30' },
@@ -73,7 +74,7 @@ function PembaTake({ day }: { day: number }) {
       setLoading(true)
       setError(false)
       try {
-        const res = await fetch(`/api/ai/plan-insight?day=${day}`)
+        const res = await fetch(`/api/ai/plan-insight?day=${day}`, { headers: byokHeaders() })
         if (!res.ok) throw new Error('failed')
         const json = await res.json()
         if (typeof json.insight === 'string' && json.insight.trim()) {

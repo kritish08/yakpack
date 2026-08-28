@@ -7,7 +7,7 @@ interface SuggestedItem {
   name: string
   qty?: string
   status?: 'owned' | 'to_buy' | 'standard'
-  assigned_to?: 'kritish' | 'partner' | 'shared'
+  assigned_to?: 'organiser' | 'partner_1' | 'partner_2' | 'shared'
 }
 
 interface ConfirmAddSheetProps {
@@ -18,7 +18,7 @@ interface ConfirmAddSheetProps {
 }
 
 const assignedLabel: Record<string, string> = {
-  kritish: 'Kritish',
+  owner: 'You',
   partner: 'Partner',
   shared: 'Both',
 }

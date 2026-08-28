@@ -5,13 +5,13 @@ import { usePathname } from 'next/navigation'
 import { Sun, Package, ShoppingCart, Map, MessageCircle } from 'lucide-react'
 
 const baseTabs = [
-  { label: 'Today',   href: '/',       icon: Sun },
-  { label: 'Pack',    href: '/pack',   icon: Package },
-  { label: 'Summary', href: '/to-buy', icon: ShoppingCart },
-  { label: 'Plan',    href: '/plan',   icon: Map },
+  { label: 'Today',   href: '/app',        icon: Sun },
+  { label: 'Pack',    href: '/app/pack',   icon: Package },
+  { label: 'Summary', href: '/app/to-buy', icon: ShoppingCart },
+  { label: 'Plan',    href: '/app/plan',   icon: Map },
 ]
 
-const askTab = { label: 'Ask', href: '/ask', icon: MessageCircle }
+const askTab = { label: 'Ask', href: '/app/ask', icon: MessageCircle }
 
 export default function BottomNav({ aiEnabled }: { aiEnabled: boolean }) {
   const pathname = usePathname()
@@ -24,7 +24,7 @@ export default function BottomNav({ aiEnabled }: { aiEnabled: boolean }) {
       className="fixed bottom-0 inset-x-0 flex bg-surface border-t border-border z-50 pb-[env(safe-area-inset-bottom)]"
     >
       {tabs.map(({ label, href, icon: Icon }) => {
-        const active = pathname === href || (href !== '/' && pathname.startsWith(href))
+        const active = pathname === href || (href !== '/app' && pathname.startsWith(href))
         return (
           <Link
             key={href}

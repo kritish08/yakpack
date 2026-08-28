@@ -1,12 +1,27 @@
 'use client'
 
-import { useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Plus, Check, Pencil, Trash2, Ban, X, Sparkles, Search } from 'lucide-react'
-import type { CategoryWithToBuy, Item, Packed, Profile, Category, Trip } from '@/lib/tobuy'
+import type { CategoryWithToBuy, Item, Packed, Category, Trip } from '@/lib/tobuy'
+import type { AssignedTo as MemberAssigned, MemberKey as MemberKeyT, MemberView } from '@/lib/database.types'
 import { overallProgress, personProgress, categoryProgress } from '@/lib/progress'
 import { addItem, updateItem, removeFromShopping } from '@/app/actions/items'
 import { addCategory, updateCategory, deleteCategory } from '@/app/actions/categories'
+import { byokHeaders } from '@/lib/byok'
+
+// One colour per slot, matching the person dots on the Pack screen.
+const SLOT_BAR: Record<MemberKeyT, string> = {
+  organiser: 'bg-accent',
+  partner_1: 'bg-accent-4',
+  partner_2: 'bg-accent-2',
+}
+const SLOT_STYLE: Record<MemberKeyT, { bar: string; border: string; text: string }> = {
+  organiser: { bar: 'bg-accent',   border: 'border-accent/20',   text: 'text-accent'   },
+  partner_1: { bar: 'bg-accent-4', border: 'border-accent-4/20', text: 'text-accent-4' },
+  partner_2: { bar: 'bg-accent-2', border: 'border-accent-2/20', text: 'text-accent-2' },
+}
 
 // ── Chips ──────────────────────────────────────────────────────────────────────
 const assignedChip: Record<string, { label: string; cls: string }> = {
@@ -17,7 +32,7 @@ const assignedChip: Record<string, { label: string; cls: string }> = {
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface SummaryScreenProps {
-  profile:              Profile
+  ctx:                  MemberView
   categories:           Category[]
   allItems:             Item[]
   categoriesWithToBuy:  CategoryWithToBuy[]
@@ -28,7 +43,7 @@ interface SummaryScreenProps {
   gapsNode?:            ReactNode
 }
 
-type AssignedTo = 'kritish' | 'partner' | 'shared'
+type AssignedTo = MemberAssigned
 type SheetState = { mode: 'add' } | { mode: 'edit'; item: Item }
 type CatSheetState = { mode: 'add' } | { mode: 'edit'; cat: Category }
 
@@ -72,7 +87,7 @@ function BottomSheet({ onClose, children }: { onClose: () => void; children: Rea
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function SummaryScreen({
-  profile, categories, allItems, categoriesWithToBuy, packed, trip, today, aiEnabled, gapsNode,
+  ctx, categories, allItems, categoriesWithToBuy, packed, trip, today, aiEnabled, gapsNode,
 }: SummaryScreenProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -88,13 +103,37 @@ export default function SummaryScreen({
   // Sync when server re-fetches (router.refresh)
   useEffect(() => {
     setToBuyItems(categoriesWithToBuy.flatMap(c => c.items))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoriesWithToBuy])
 
   useEffect(() => {
     setLocalCategories(categories)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories])
+
+  // Realtime — the other phone's edits land here too.
+  //
+  // Summary renders from server props and has no optimistic channel for REMOTE
+  // writes, so rather than hand-patching local state from each payload we just
+  // re-fetch: router.refresh() re-runs getToBuyData() and the two sync effects
+  // above pick the new props up. Debounced because one action can emit a burst
+  // of row events (deleting a category, or Pemba adding ten items at once).
+  const supabase = useMemo(() => createClient(), [])
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current)
+      refreshTimer.current = setTimeout(() => startTransition(() => router.refresh()), 250)
+    }
+    const channel = supabase
+      .channel('summary-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' },      scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'packed' },     scheduleRefresh)
+      .subscribe()
+    return () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current)
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, router])
 
   // ── Item sheet state ─────────────────────────────────────────────────────────
   const [sheet,    setSheet]    = useState<SheetState | null>(null)
@@ -133,17 +172,23 @@ export default function SummaryScreen({
     .map(cat => ({ ...cat, items: visibleToBuy.filter(i => i.category_id === cat.id) }))
     .filter(cat => cat.items.length > 0)
 
-  const partnerRole = profile.role === 'kritish' ? 'partner' : 'kritish'
-  const myLabel     = profile.display_name || (profile.role === 'kritish' ? 'Kritish' : 'Gitansh')
-  const partLabel   = profile.role === 'kritish' ? 'Gitansh' : 'Kritish'
+  const overall = overallProgress(allItems, packed, ctx.memberKey)
+  const pct = overall.total > 0 ? Math.round((overall.done / overall.total) * 100) : 0
 
-  const overall = overallProgress(allItems, packed, profile.role)
-  const me      = personProgress(allItems, packed, profile.role,  myLabel,  'bg-accent')
-  const partner = personProgress(allItems, packed, partnerRole, partLabel, 'bg-accent-4')
-
-  const pct   = overall.total > 0 ? Math.round((overall.done / overall.total) * 100) : 0
-  const mePct = me.total      > 0 ? Math.round((me.done      / me.total)      * 100) : 0
-  const ptPct = partner.total > 0 ? Math.round((partner.done / partner.total) * 100) : 0
+  // One card per person actually in the trip, mine first. A solo trip shows one
+  // card rather than a second empty one for a partner who does not exist.
+  const perPerson = [...ctx.members]
+    .sort((a, b) => Number(b.isMe) - Number(a.isMe))
+    .map(m => {
+      const stat = personProgress(allItems, packed, m.memberKey, m.displayName, SLOT_BAR[m.memberKey])
+      return {
+        key: m.memberKey,
+        label: m.isMe ? 'Me' : m.displayName,
+        stat,
+        pct: stat.total > 0 ? Math.round((stat.done / stat.total) * 100) : 0,
+        ...SLOT_STYLE[m.memberKey],
+      }
+    })
 
   // ── Item sheet handlers ──────────────────────────────────────────────────────
   function openAdd() {
@@ -167,7 +212,7 @@ export default function SummaryScreen({
     try {
       const res = await fetch('/api/ai/parse-item', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...byokHeaders() },
         body:    JSON.stringify({ text: form.name, categories: localCategories.map(c => ({ id: c.id, name: c.name })) }),
       })
       if (!res.ok) return
@@ -322,12 +367,9 @@ export default function SummaryScreen({
       </section>
 
       {/* Per-person */}
-      <div className="grid grid-cols-2 gap-3">
-        {([
-          { label: 'Me',      stat: me,      pct: mePct, bar: 'bg-accent',   border: 'border-accent/20',   text: 'text-accent'   },
-          { label: 'Partner', stat: partner,  pct: ptPct, bar: 'bg-accent-4', border: 'border-accent-4/20', text: 'text-accent-4' },
-        ] as const).map(({ label, stat, pct: p, bar, border, text }) => (
-          <div key={label} className={`bg-surface border rounded-xl p-3 ${border}`}>
+      <div className={`grid gap-3 ${perPerson.length >= 3 ? 'grid-cols-3' : perPerson.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {perPerson.map(({ key, label, stat, pct: p, bar, border, text }) => (
+          <div key={key} className={`bg-surface border rounded-xl p-3 ${border}`}>
             <div className="flex items-center justify-between mb-1.5">
               <p className={`font-mono text-[10px] uppercase tracking-wider ${text}`}>{label}</p>
               <span className={`font-mono text-[10px] font-bold ${text}`}>{p}%</span>
@@ -475,7 +517,7 @@ export default function SummaryScreen({
         </div>
         <div className="divide-y divide-border/40">
           {localCategories.map(cat => {
-            const s = categoryProgress(allItems, packed, profile.role, cat.id as number, cat.name)
+            const s = categoryProgress(allItems, packed, ctx.memberKey, cat.id as number, cat.name)
             if (s.total === 0) return null
             const cp = Math.round((s.done / s.total) * 100)
             return (
@@ -621,7 +663,7 @@ export default function SummaryScreen({
             <div className="mb-3">
               <label className="font-mono text-[10px] uppercase tracking-wider text-text-muted mb-1.5 block">For</label>
               <div className="flex gap-2">
-                {(['kritish', 'partner', 'shared'] as const).map(role => (
+                {([...ctx.members.map(m => m.memberKey), 'shared' as const]).map(role => (
                   <button
                     key={role}
                     onClick={() => setForm(f => ({ ...f, assigned_to: role }))}
@@ -631,7 +673,9 @@ export default function SummaryScreen({
                         : 'bg-surface-2 text-text-muted border-border hover:border-accent/30'
                     }`}
                   >
-                    {role === 'kritish' ? 'Kritish' : role === 'partner' ? 'Partner' : 'Both'}
+                    {role === 'shared'
+                      ? 'Everyone'
+                      : ctx.members.find(m => m.memberKey === role)?.displayName ?? role}
                   </button>
                 ))}
               </div>

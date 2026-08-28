@@ -1,6 +1,6 @@
 import { AI_ENABLED } from '@/lib/ai'
 import { createClient } from '@/lib/supabase/server'
-import { getBriefing } from '@/lib/briefing'
+import { getTripContext } from '@/lib/trip'
 import ChatWrapper from '@/components/ask/chat-wrapper'
 
 interface AskPageProps {
@@ -25,12 +25,12 @@ export default async function AskPage({ searchParams }: AskPageProps) {
   const dayNum = day ? Number(day) : NaN
 
   const supabase = await createClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [briefing, { data: firstCategoryRaw }, legRes] = await Promise.all([
-    getBriefing(),
-    (supabase.from('categories') as any).select('id').order('sort_order').limit(1).single(),
+  const { tripId } = await getTripContext()
+  const [{ data: firstCategoryRaw }, legRes] = await Promise.all([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('categories') as any).select('id').eq('trip_id', tripId).order('sort_order').limit(1).maybeSingle(),
     Number.isInteger(dayNum)
-      ? supabase.from('itinerary').select('day, leg').eq('day', dayNum).single()
+      ? supabase.from('itinerary').select('day, leg').eq('trip_id', tripId).eq('day', dayNum).maybeSingle()
       : Promise.resolve({ data: null }),
   ])
   const defaultCategoryId = (firstCategoryRaw as { id: number } | null)?.id ?? 1
@@ -44,7 +44,7 @@ export default async function AskPage({ searchParams }: AskPageProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <ChatWrapper briefing={briefing} defaultCategoryId={defaultCategoryId} initialInput={initialInput} />
+      <ChatWrapper briefing={null} defaultCategoryId={defaultCategoryId} initialInput={initialInput} />
     </div>
   )
 }

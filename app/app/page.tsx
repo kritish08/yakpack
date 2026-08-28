@@ -1,4 +1,3 @@
-import { Suspense } from 'react'
 import { getTodayData, fetchWeather } from '@/lib/today'
 import { deriveCarryTags } from '@/lib/weather'
 import WeatherHero from '@/components/today/weather-hero'
@@ -6,7 +5,8 @@ import CarryChips from '@/components/today/carry-chips'
 import LegCard from '@/components/today/leg-card'
 import HeadsUp from '@/components/today/heads-up'
 import Pemba, { deriveMood } from '@/components/pemba/pemba'
-import AiBriefingCard, { AiBriefingCardSkeleton } from '@/components/today/ai-briefing-card'
+import AiBriefingCard from '@/components/today/ai-briefing-card'
+import { AI_ENABLED } from '@/lib/ai'
 
 export default async function TodayPage() {
   const { todayLeg, items, packedIds, isToday, isFuture, isPast } = await getTodayData()
@@ -33,10 +33,8 @@ export default async function TodayPage() {
       {/* Pemba mascot */}
       <Pemba mood={mood} />
 
-      {/* AI briefing — streams in via Suspense; rest of page is already visible */}
-      <Suspense fallback={<AiBriefingCardSkeleton />}>
-        <AiBriefingCard />
-      </Suspense>
+      {/* AI briefing — client-fetched so it can carry the caller's own key */}
+      {AI_ENABLED && <AiBriefingCard />}
 
       {/* Today's leg */}
       {todayLeg && <LegCard leg={todayLeg} isToday={isToday} isFuture={isFuture} />}

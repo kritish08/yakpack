@@ -11,6 +11,7 @@ import remarkGfm from 'remark-gfm'
 import ConfirmAddSheet from './confirm-add-sheet'
 import ConfirmActionSheet, { type ActionType, type UpdateItemInput, type DeleteItemInput, type MarkAsBoughtInput } from './confirm-action-sheet'
 import { addItem, updateItem as updateItemAction, deleteItem as deleteItemAction } from '@/app/actions/items'
+import { byokHeaders } from '@/lib/byok'
 
 import type { StoredMessage } from './chat-wrapper'
 
@@ -28,7 +29,7 @@ interface AddItemsInput {
     name: string
     qty?: string
     status?: 'owned' | 'to_buy' | 'standard'
-    assigned_to?: 'kritish' | 'partner' | 'shared'
+    assigned_to?: 'organiser' | 'partner_1' | 'partner_2' | 'shared'
     category_id?: number
   }[]
   reason: string
@@ -98,12 +99,17 @@ export default function ChatScreen({
       : []
 
   const { messages, sendMessage, addToolResult, status, error } = useChat({
-    transport: new DefaultChatTransport({ api: '/api/ai/chat' }),
+    // The key is attached per request from browser storage — it is never held
+    // server-side, so each call carries it or the server key is used instead.
+    transport: new DefaultChatTransport({
+      api: '/api/ai/chat',
+      headers: () => byokHeaders(),
+    }),
     messages: seedMessages,
     // After the client resolves a confirmation tool, automatically send the
     // result back so Pemba can acknowledge and continue the conversation.
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-    // On a network/Azure error the SDK sets status to 'error' (which re-enables
+    // On a network/OpenAI error the SDK sets status to 'error' (which re-enables
     // the input); we surface a visible notice so the user isn't left staring at
     // a stuck spinner on patchy Spiti signal.
     onError: () => {},
@@ -363,7 +369,7 @@ export default function ChatScreen({
               )
             })()}
 
-            {/* Error notice — Azure/network failure. Input is re-enabled (status='error'). */}
+            {/* Error notice — OpenAI/network failure. Input is re-enabled (status='error'). */}
             {status === 'error' && (
               <div className="flex gap-2.5">
                 <div className="w-7 h-7 rounded-xl bg-accent-3/10 border border-accent-3/20 flex items-center justify-center text-sm shrink-0 mt-0.5">🐂</div>

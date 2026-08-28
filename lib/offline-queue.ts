@@ -8,12 +8,14 @@
 // or unavailable localStorage never throws into the UI.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/lib/database.types'
+import type { AssignedTo, Database } from '@/lib/database.types'
+
+type Packed = Database['public']['Tables']['packed']['Row']
 
 export type PackedOp = {
   op: 'insert' | 'delete'
   item_id: string
-  user_key: string
+  user_key: AssignedTo
 }
 
 const STORAGE_KEY = 'yakpack:packed-outbox:v1'
@@ -39,7 +41,8 @@ export function readQueue(): PackedOp[] {
         o &&
         (o.op === 'insert' || o.op === 'delete') &&
         typeof o.item_id === 'string' &&
-        typeof o.user_key === 'string',
+        (o.user_key === 'organiser' || o.user_key === 'partner_1' ||
+         o.user_key === 'partner_2' || o.user_key === 'shared'),
     )
   } catch {
     return []
@@ -143,4 +146,32 @@ export async function flushQueue(supabase: Client): Promise<number> {
 
   writeQueue(remaining)
   return flushed
+}
+
+/**
+ * Project the pending outbox onto a `packed` row set.
+ *
+ * The page HTML served from the SW's PAGE_CACHE carries the `initialPacked`
+ * that was server-rendered when the page was last cached — i.e. from BEFORE any
+ * offline toggles. Without replaying the outbox over it, a reload while offline
+ * makes the user's offline check-offs look lost, even though they are queued and
+ * will sync. Applying the queue keeps the UI honest until the flush lands.
+ */
+export function applyOps(rows: Packed[], ops: PackedOp[]): Packed[] {
+  if (ops.length === 0) return rows
+  let next = rows
+  for (const op of ops) {
+    const matches = (r: Packed) => r.item_id === op.item_id && r.user_key === op.user_key
+    if (op.op === 'delete') {
+      next = next.filter(r => !matches(r))
+    } else if (!next.some(matches)) {
+      next = [...next, {
+        item_id: op.item_id,
+        user_key: op.user_key,
+        packed: true,
+        packed_at: null,
+      }]
+    }
+  }
+  return next
 }

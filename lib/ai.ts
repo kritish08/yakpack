@@ -2,6 +2,9 @@ import { createOpenAI } from '@ai-sdk/openai'
 
 export const AI_ENABLED = process.env.AI_ENABLED === 'true'
 
+// Overridable via OPENAI_MODEL — see getModel() below.
+const DEFAULT_MODEL = 'gpt-5.6-luna'
+
 export const PEMBA_SYSTEM = `\
 You are Pemba, the YakPack AI companion — a wise, warm yak helping Kritish and Gitansh navigate their Spiti Valley expedition (June 19–27, 2026).
 
@@ -15,18 +18,47 @@ MEDICAL SAFETY: You may discuss altitude acclimatisation, AMS symptoms, rest day
 
 Keep responses under 120 words unless the user explicitly asks for more detail.`
 
-export function getAzureModel() {
-  // New Azure AI Foundry endpoint (*.services.ai.azure.com/openai/v1) is
-  // OpenAI-compatible — use createOpenAI so it hits /v1/chat/completions or
-  // /v1/responses directly, not /deployments/{name}/... (the old Azure path).
-  const baseURL = process.env.AZURE_OPENAI_ENDPOINT ?? ''
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT ?? 'gpt-4o'
-  const useResponses = process.env.AZURE_USE_RESPONSES_API === 'true'
+/**
+ * Resolves which OpenAI key pays for this request.
+ *
+ * Order matters, and the fallback is deliberately narrow:
+ *   1. The caller's own key, arriving as a per-request header (BYOK). Used for
+ *      that one request and never persisted.
+ *   2. The deployment's server key — **only for an admin**. Without that guard,
+ *      any stranger who registered would be spending the operator's credits,
+ *      which is the exact thing BYOK exists to prevent.
+ *
+ * Returns null when neither applies; callers answer 402 rather than crashing.
+ */
+export function resolveKey(req: Request, callerIsAdmin: boolean): string | null {
+  const byok = req.headers.get('x-openai-key')?.trim()
+  if (byok) return byok
+  if (callerIsAdmin) return process.env.OPENAI_API_KEY?.trim() || null
+  return null
+}
+
+/**
+ * Builds the model client for a resolved key.
+ *
+ * Model id and API surface stay env-driven so swapping models is a dashboard
+ * change rather than a deploy; a BYOK caller may override the model per request.
+ */
+export function getModel(key: string, modelId?: string | null) {
+  const model = modelId?.trim() || process.env.OPENAI_MODEL || DEFAULT_MODEL
+  const useResponses = process.env.OPENAI_USE_RESPONSES !== 'false'
+  const baseURL = process.env.OPENAI_BASE_URL
 
   const client = createOpenAI({
-    baseURL,
-    apiKey: process.env.AZURE_OPENAI_API_KEY!,
+    apiKey: key,
+    ...(baseURL ? { baseURL } : {}),
   })
 
-  return useResponses ? client.responses(deployment) : client(deployment)
+  return useResponses ? client.responses(model) : client(model)
+}
+
+/** Convenience: resolve the key and build the model, or null if there is no key. */
+export function modelForRequest(req: Request, callerIsAdmin: boolean) {
+  const key = resolveKey(req, callerIsAdmin)
+  if (!key) return null
+  return getModel(key, req.headers.get('x-openai-model'))
 }

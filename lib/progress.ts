@@ -1,8 +1,7 @@
-import type { Database } from '@/lib/database.types'
+import type { Database, MemberKey } from '@/lib/database.types'
 
 type Item = Database['public']['Tables']['items']['Row']
 type Packed = Database['public']['Tables']['packed']['Row']
-type ProfileRole = 'kritish' | 'partner'
 
 export interface ProgressStat {
   label: string
@@ -11,38 +10,38 @@ export interface ProgressStat {
   color: string
 }
 
-function isPackedFor(item: Item, packed: Packed[], userKey: string) {
-  const key = item.scope === 'each' ? userKey : 'shared'
+function isPackedFor(item: Item, packed: Packed[], memberKey: MemberKey) {
+  const key = item.scope === 'each' ? memberKey : 'shared'
   return packed.some(p => p.item_id === item.id && p.user_key === key)
 }
 
-export function overallProgress(items: Item[], packed: Packed[], role: ProfileRole): ProgressStat {
+export function overallProgress(items: Item[], packed: Packed[], memberKey: MemberKey): ProgressStat {
   const total = items.length
-  const done = items.filter(i => isPackedFor(i, packed, role)).length
+  const done = items.filter(i => isPackedFor(i, packed, memberKey)).length
   return { label: 'Overall', done, total, color: 'bg-accent' }
 }
 
 export function personProgress(
   items: Item[],
   packed: Packed[],
-  role: ProfileRole,
+  memberKey: MemberKey,
   label: string,
-  color: string
+  color: string,
 ): ProgressStat {
-  // My items = assigned to me OR shared
-  const mine = items.filter(i => i.assigned_to === role || i.assigned_to === 'shared')
-  const done = mine.filter(i => isPackedFor(i, packed, role)).length
+  // Their items = assigned to them, or shared.
+  const mine = items.filter(i => i.assigned_to === memberKey || i.assigned_to === 'shared')
+  const done = mine.filter(i => isPackedFor(i, packed, memberKey)).length
   return { label, done, total: mine.length, color }
 }
 
 export function categoryProgress(
   items: Item[],
   packed: Packed[],
-  role: ProfileRole,
+  memberKey: MemberKey,
   categoryId: number,
-  categoryName: string
+  categoryName: string,
 ): ProgressStat {
   const catItems = items.filter(i => i.category_id === categoryId)
-  const done = catItems.filter(i => isPackedFor(i, packed, role)).length
+  const done = catItems.filter(i => isPackedFor(i, packed, memberKey)).length
   return { label: categoryName, done, total: catItems.length, color: 'bg-accent-2' }
 }

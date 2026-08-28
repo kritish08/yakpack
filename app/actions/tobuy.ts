@@ -1,19 +1,24 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getWritableTripId } from '@/lib/trip'
 import { sanitizeText } from '@/lib/sanitize'
+import type { AssignedTo } from '@/lib/database.types'
+
+function revalidateLists() {
+  revalidatePath('/app/to-buy')
+  revalidatePath('/app/pack')
+}
 
 export async function markAsBought(itemId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  await getWritableTripId()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('items') as any)
     .update({ status: 'owned' })
     .eq('id', itemId)
   if (error) throw new Error(error.message)
-  revalidatePath('/to-buy')
-  revalidatePath('/pack')
+  revalidateLists()
 }
 
 export async function addToBuyItem(data: {
@@ -21,13 +26,13 @@ export async function addToBuyItem(data: {
   name: string
   qty?: string
   note?: string
-  assigned_to: 'kritish' | 'partner' | 'shared'
+  assigned_to: AssignedTo
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  const { tripId } = await getWritableTripId()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('items') as any).insert({
+    trip_id: tripId,
     category_id: data.category_id,
     name: sanitizeText(data.name),
     qty: data.qty ?? null,
@@ -38,6 +43,5 @@ export async function addToBuyItem(data: {
     carry_tags: [],
   })
   if (error) throw new Error(error.message)
-  revalidatePath('/to-buy')
-  revalidatePath('/pack')
+  revalidateLists()
 }

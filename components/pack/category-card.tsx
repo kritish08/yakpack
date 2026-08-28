@@ -2,25 +2,26 @@
 
 import { useState, useTransition } from 'react'
 import { ChevronDown, Plus, X, Check } from 'lucide-react'
-import type { CategoryWithItems, Item, Packed, Profile } from '@/lib/pack'
+import type { CategoryWithItems, Item, Packed } from '@/lib/pack'
+import type { AssignedTo, ItemStatus, MemberView } from '@/lib/database.types'
 import ItemRow from './item-row'
 import { addItem } from '@/app/actions/items'
 
 interface CategoryCardProps {
   category: CategoryWithItems
   packed: Packed[]
-  profile: Profile
-  onToggle: (itemId: string, userKey: string, isPacked: boolean) => void
+  ctx: MemberView
+  onToggle: (itemId: string, userKey: AssignedTo, isPacked: boolean) => void
   onEdit?: (item: Item) => void
   onDelete?: (itemId: string) => void
   forceOpen?: boolean       // override collapse while searching
   hideAddForm?: boolean     // hide the per-category add control while searching
 }
 
-function countPacked(items: CategoryWithItems['items'], packed: Packed[], profileRole: string) {
+function countPacked(items: CategoryWithItems['items'], packed: Packed[], memberKey: string) {
   let total = 0, done = 0
   for (const item of items) {
-    const userKey = item.scope === 'each' ? profileRole : 'shared'
+    const userKey = item.scope === 'each' ? memberKey : 'shared'
     total++
     if (packed.some(p => p.item_id === item.id && p.user_key === userKey)) done++
   }
@@ -30,17 +31,17 @@ function countPacked(items: CategoryWithItems['items'], packed: Packed[], profil
 const inputClass =
   'bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent transition-colors'
 
-export default function CategoryCard({ category, packed, profile, onToggle, onEdit, onDelete, forceOpen, hideAddForm }: CategoryCardProps) {
+export default function CategoryCard({ category, packed, ctx, onToggle, onEdit, onDelete, forceOpen, hideAddForm }: CategoryCardProps) {
   const [open, setOpen] = useState(true)
   const isOpen = forceOpen || open
   const [showAddForm, setShowAddForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newQty, setNewQty] = useState('')
-  const [newAssignedTo, setNewAssignedTo] = useState<'kritish' | 'partner' | 'shared'>('shared')
-  const [newStatus, setNewStatus] = useState<'owned' | 'to_buy' | 'standard'>('standard')
+  const [newAssignedTo, setNewAssignedTo] = useState<AssignedTo>('shared')
+  const [newStatus, setNewStatus] = useState<ItemStatus>('standard')
   const [isPending, startTransition] = useTransition()
 
-  const { total, done } = countPacked(category.items, packed, profile.role)
+  const { total, done } = countPacked(category.items, packed, ctx.memberKey)
   const allDone = total > 0 && done === total
   const progress = total > 0 ? (done / total) * 100 : 0
 
@@ -91,7 +92,7 @@ export default function CategoryCard({ category, packed, profile, onToggle, onEd
           {category.items.length > 0 ? (
             <div className="divide-y divide-border/50">
               {category.items.map(item => (
-                <ItemRow key={item.id} item={item} packed={packed} profile={profile} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />
+                <ItemRow key={item.id} item={item} packed={packed} ctx={ctx} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />
               ))}
             </div>
           ) : (
@@ -111,7 +112,7 @@ export default function CategoryCard({ category, packed, profile, onToggle, onEd
               />
               <div className="flex gap-2">
                 <input type="text" value={newQty} onChange={e => setNewQty(e.target.value)} placeholder="Qty" className={`${inputClass} w-20 shrink-0`} />
-                <select value={newStatus} onChange={e => setNewStatus(e.target.value as 'owned' | 'to_buy' | 'standard')} className={`${inputClass} flex-1`}>
+                <select value={newStatus} onChange={e => setNewStatus(e.target.value as ItemStatus)} className={`${inputClass} flex-1`}>
                   <option value="owned">Owned</option>
                   <option value="to_buy">To Buy</option>
                   <option value="standard">Standard</option>
@@ -120,9 +121,9 @@ export default function CategoryCard({ category, packed, profile, onToggle, onEd
               {/* Who carries it — pill toggle */}
               <div className="flex rounded-lg border border-border overflow-hidden text-xs font-mono">
                 {([
-                  { v: profile.role, label: 'Individual' },
+                  { v: ctx.memberKey, label: 'Individual' },
                   { v: 'shared', label: 'Shared' },
-                ] as { v: 'kritish' | 'partner' | 'shared'; label: string }[]).map(({ v, label }) => (
+                ] as { v: AssignedTo; label: string }[]).map(({ v, label }) => (
                   <button
                     key={v}
                     type="button"

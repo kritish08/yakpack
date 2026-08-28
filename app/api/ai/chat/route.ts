@@ -1,7 +1,9 @@
 import { streamText, tool, stepCountIs, convertToModelMessages } from 'ai'
 import { z } from 'zod'
-import { AI_ENABLED, getAzureModel, PEMBA_SYSTEM } from '@/lib/ai'
+import { AI_ENABLED, modelForRequest, PEMBA_SYSTEM } from '@/lib/ai'
+import { isAdmin } from '@/lib/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getTripContext } from '@/lib/trip'
 import type { Database } from '@/lib/database.types'
 
 export const maxDuration = 30
@@ -13,9 +15,21 @@ type CategoryRow = Database['public']['Tables']['categories']['Row']
 export async function POST(req: Request) {
   if (!AI_ENABLED) return new Response('AI not enabled', { status: 403 })
 
+  // Only an admin may fall back to the deployment's key; everyone else brings
+  // their own, so a signup cannot spend the operator's credits.
+  const model = modelForRequest(req, await isAdmin())
+  if (!model) {
+    return new Response('Add your OpenAI key in Settings to talk to Pemba.', { status: 402 })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return new Response('Unauthorized', { status: 401 })
+
+  // Every tool below reads through this trip id. RLS already fences the rows,
+  // but scoping the query keeps a multi-trip user's answers correct rather than
+  // merely safe — otherwise Pemba could mix two trips' packing lists together.
+  const { tripId } = await getTripContext()
 
   const { messages } = await req.json()
 
@@ -46,7 +60,7 @@ export async function POST(req: Request) {
     onError: (err) => {
       console.error('[chat] streamText error:', JSON.stringify(err, null, 2))
     },
-    model: getAzureModel(),
+    model,
     system: PEMBA_SYSTEM,
     messages: await convertToModelMessages(trimmed),
     stopWhen: stepCountIs(5),
@@ -62,6 +76,7 @@ export async function POST(req: Request) {
           const { data } = await supabase
             .from('itinerary')
             .select('*')
+            .eq('trip_id', tripId)
             .lte('date', today)
             .order('date', { ascending: false })
             .limit(1)
@@ -75,7 +90,7 @@ export async function POST(req: Request) {
         description: 'Get the full 9-day trip itinerary with all legs, dates, and details.',
         inputSchema: z.object({}),
         execute: async () => {
-          const { data } = await supabase.from('itinerary').select('*').order('day')
+          const { data } = await supabase.from('itinerary').select('*').eq('trip_id', tripId).order('day')
           return data as ItineraryRow[] | null
         },
       }),
@@ -89,6 +104,7 @@ export async function POST(req: Request) {
           const { data: rawLeg } = await supabase
             .from('itinerary')
             .select('lat, lon, leg, altitude_m')
+            .eq('trip_id', tripId)
             .eq('day', day)
             .single()
           const leg = rawLeg as Pick<ItineraryRow, 'lat' | 'lon' | 'leg' | 'altitude_m'> | null
@@ -110,6 +126,7 @@ export async function POST(req: Request) {
           const { data } = await supabase
             .from('categories')
             .select('id, name, icon, sort_order')
+            .eq('trip_id', tripId)
             .order('sort_order')
           return data as Pick<CategoryRow, 'id' | 'name' | 'icon' | 'sort_order'>[] | null
         },
@@ -125,6 +142,7 @@ export async function POST(req: Request) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let q = (supabase.from('items') as any)
             .select('id, name, status, assigned_to, scope, carry_tags, category_id, qty, note')
+            .eq('trip_id', tripId)
             .order('sort_order')
           if (filter === 'to_buy') q = q.eq('status', 'to_buy')
           const { data: items } = await q as {
@@ -132,7 +150,10 @@ export async function POST(req: Request) {
           }
 
           if (filter === 'unpacked') {
-            const { data: packed } = await supabase.from('packed').select('item_id')
+            const { data: packed } = await supabase
+              .from('packed')
+              .select('item_id, items!inner(trip_id)')
+              .eq('items.trip_id', tripId)
             const packedSet = new Set(packed?.map((p: { item_id: string }) => p.item_id))
             return (items ?? []).filter(i => !packedSet.has(i.id))
           }
@@ -150,7 +171,7 @@ export async function POST(req: Request) {
             name:        z.string().describe('Item name'),
             qty:         z.string().optional().describe('Optional quantity, e.g. "2"'),
             status:      z.enum(['owned', 'to_buy', 'standard']).default('standard'),
-            assigned_to: z.enum(['kritish', 'partner', 'shared']).default('shared'),
+            assigned_to: z.enum(['organiser', 'partner_1', 'partner_2', 'shared']).default('shared'),
             category_id: z.number().optional().describe('Category ID from getCategories — omit to use default'),
           })),
           reason: z.string().describe('Why these items are suggested'),
@@ -166,7 +187,7 @@ export async function POST(req: Request) {
             name:        z.string().optional().describe('New item name'),
             qty:         z.string().nullable().optional().describe('New quantity, or null to clear'),
             status:      z.enum(['owned', 'to_buy', 'standard']).optional(),
-            assigned_to: z.enum(['kritish', 'partner', 'shared']).optional(),
+            assigned_to: z.enum(['organiser', 'partner_1', 'partner_2', 'shared']).optional(),
             category_id: z.number().optional(),
           }),
           reason: z.string().describe('Why this change is being made'),

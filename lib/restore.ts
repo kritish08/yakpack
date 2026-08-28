@@ -48,15 +48,35 @@ async function main() {
   }
   const supabase = createClient(supabaseUrl, serviceKey)
 
+  // ── Target trip ─────────────────────────────────────────────────────────────
+  // Every query below is scoped to one trip. Restoring across all trips would
+  // push this repo's master list into strangers' accounts, so the target is
+  // explicit: --trip=<uuid>, defaulting to the template that new signups copy.
+  const tripArg = process.argv.find(a => a.startsWith('--trip='))?.slice('--trip='.length)
+  let tripId = tripArg ?? null
+  if (!tripId) {
+    const { data: tpl, error } = await supabase
+      .from('trips').select('id').eq('is_template', true).order('created_at').limit(1).maybeSingle()
+    if (error) { console.error('ERROR reading template trip:', error); process.exit(1) }
+    tripId = (tpl as { id: string } | null)?.id ?? null
+  }
+  if (!tripId) {
+    console.error('ERROR: no target trip. Run `pnpm seed` first, or pass --trip=<uuid>.')
+    process.exit(1)
+  }
+  console.log(`Target trip: ${tripId}`)
+
   // ── Current DB state ────────────────────────────────────────────────────────
   const { data: dbCategories, error: catErr } = await supabase
     .from('categories')
     .select('id, name, sort_order')
+    .eq('trip_id', tripId)
   if (catErr) { console.error('ERROR reading categories:', catErr); process.exit(1) }
 
   const { data: dbItems, error: itemErr } = await supabase
     .from('items')
     .select('id, name, category_id')
+    .eq('trip_id', tripId)
   if (itemErr) { console.error('ERROR reading items:', itemErr); process.exit(1) }
 
   // sort_order → category_id (master uses sort_order as the stable key)
@@ -80,7 +100,7 @@ async function main() {
   if (missingCategories.length > 0 && !isDryRun) {
     const { data: insertedCats, error } = await supabase
       .from('categories')
-      .insert(missingCategories.map(c => ({ name: c.name, sort_order: c.sort_order, icon: c.icon })))
+      .insert(missingCategories.map(c => ({ trip_id: tripId, name: c.name, sort_order: c.sort_order, icon: c.icon })))
       .select('id, name, sort_order')
     if (error) { console.error('ERROR inserting categories:', error); process.exit(1) }
     for (const c of insertedCats ?? []) {
@@ -176,7 +196,7 @@ async function main() {
 
   const { data: inserted, error: insErr } = await supabase
     .from('items')
-    .insert(rows)
+    .insert(rows.map(r => ({ ...r, trip_id: tripId })))
     .select('id, scope')
   if (insErr) { console.error('ERROR inserting items:', insErr); process.exit(1) }
 
@@ -184,7 +204,7 @@ async function main() {
   const packedRows: Array<{ item_id: string; user_key: string; packed: boolean }> = []
   for (const it of inserted ?? []) {
     if (it.scope === 'each') {
-      packedRows.push({ item_id: it.id, user_key: 'kritish', packed: false })
+      packedRows.push({ item_id: it.id, user_key: 'organiser', packed: false })
       packedRows.push({ item_id: it.id, user_key: 'partner', packed: false })
     } else {
       packedRows.push({ item_id: it.id, user_key: 'shared', packed: false })

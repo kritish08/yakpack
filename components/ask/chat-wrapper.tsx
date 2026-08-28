@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Clock, Plus, Trash2, X, MessageSquare } from 'lucide-react'
 import ChatScreen from './chat-screen'
 

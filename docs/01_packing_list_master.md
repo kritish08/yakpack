@@ -22,8 +22,12 @@
 
 | Role | Name | Phone |
 |---|---|---|
-| Trip Coordinator / POC (Zotrip Ops) | Ritvik | [redacted] |
-| Trip Leader (on-ground) | Sashi | [redacted] |
+| Trip Coordinator / POC (tour operator) | _(set via env)_ | _(set via env)_ |
+| Trip Leader (on-ground) | _(set via env)_ | _(set via env)_ |
+
+> Real contact details are intentionally **not** committed — they belong to third
+> parties. The seed script reads them from `TRIP_COORDINATOR_*` / `TRIP_LEADER_*`
+> environment variables. See `.env.example`.
 
 ---
 

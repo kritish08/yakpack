@@ -5,20 +5,22 @@ import { Search, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import CategoryCard from './category-card'
 import EditItemSheet from './edit-item-sheet'
-import type { CategoryWithItems, Item, Packed, Profile } from '@/lib/pack'
+import type { CategoryWithItems, Item, Packed } from '@/lib/pack'
+import type { AssignedTo } from '@/lib/database.types'
+import type { MemberView } from '@/lib/database.types'
 import type { Database } from '@/lib/database.types'
 import { deleteItem } from '@/app/actions/items'
-import { enqueueOp, flushQueue } from '@/lib/offline-queue'
+import { applyOps, enqueueOp, readQueue } from '@/lib/offline-queue'
 
 type PackedInsert = Database['public']['Tables']['packed']['Insert']
 
 interface PackScreenProps {
-  profile: Profile
+  ctx: MemberView
   categoriesWithItems: CategoryWithItems[]
   initialPacked: Packed[]
 }
 
-export default function PackScreen({ profile, categoriesWithItems, initialPacked }: PackScreenProps) {
+export default function PackScreen({ ctx, categoriesWithItems, initialPacked }: PackScreenProps) {
   const [packed, setPacked] = useState<Packed[]>(initialPacked)
   const [categories, setCategories] = useState<CategoryWithItems[]>(categoriesWithItems)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
@@ -54,17 +56,20 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
     return () => { supabase.removeChannel(channel) }
   }, [supabase])
 
-  // Replay any offline-queued packed toggles on mount and whenever we regain
-  // connectivity. Realtime reconciles the resulting server state back into UI.
+  // Replay the offline outbox over the server-rendered rows.
+  //
+  // When this page is served from the SW's page cache (offline reload),
+  // `initialPacked` is the snapshot from when the page was last cached — it does
+  // NOT include toggles made offline since. Projecting the queue over it keeps
+  // those check-offs visible instead of appearing to vanish on reload.
+  //
+  // Flushing the queue is handled app-wide by <OfflineSync>; this effect only
+  // reconciles what the queue still holds into the view.
   useEffect(() => {
-    let cancelled = false
-    const flush = () => { flushQueue(supabase).catch(() => {}) }
-    if (!cancelled) flush()
-    window.addEventListener('online', flush)
-    return () => { cancelled = true; window.removeEventListener('online', flush) }
-  }, [supabase])
+    setPacked(applyOps(initialPacked, readQueue()))
+  }, [initialPacked])
 
-  const handleToggle = useCallback(async (itemId: string, userKey: string, isPacked: boolean) => {
+  const handleToggle = useCallback(async (itemId: string, userKey: AssignedTo, isPacked: boolean) => {
     if (isPacked) {
       setPacked(prev => prev.filter(p => !(p.item_id === itemId && p.user_key === userKey)))
       try {
@@ -110,7 +115,7 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
   const totalItems = categories.reduce((s, c) => s + c.items.length, 0)
   const totalPacked = categories.reduce((s, c) =>
     s + c.items.filter(item => {
-      const key = item.scope === 'each' ? profile.role : 'shared'
+      const key = item.scope === 'each' ? ctx.memberKey : 'shared'
       return packed.some(p => p.item_id === item.id && p.user_key === key)
     }).length, 0)
   const pct = totalItems > 0 ? Math.round((totalPacked / totalItems) * 100) : 0
@@ -178,7 +183,7 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
             key={cat.id}
             category={cat}
             packed={packed}
-            profile={profile}
+            ctx={ctx}
             onToggle={handleToggle}
             onEdit={item => setEditingItem(item)}
             onDelete={handleDelete}
@@ -202,7 +207,7 @@ export default function PackScreen({ profile, categoriesWithItems, initialPacked
       </div>
       <EditItemSheet
         item={editingItem}
-        role={profile.role}
+        role={ctx.memberKey}
         onClose={() => setEditingItem(null)}
         onSaved={handleItemSaved}
         onDeleted={handleItemDeleted}

@@ -1,21 +1,22 @@
 'use client'
 
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
-import type { Leg, Trip, Profile, LegWeather } from '@/lib/plan'
+import type { Leg, Trip, LegWeather } from '@/lib/plan'
+import type { MemberView } from '@/lib/database.types'
 import { amsRisk } from '@/lib/ams'
 import DayCard from './day-card'
 
 interface PlanScreenProps {
   legs:            Leg[]
   trip:            Trip | null
-  profile:         Profile
+  ctx:             MemberView
   today:           string
   weatherMap?:     Record<number, LegWeather | null>
   todayInsightNode?: ReactNode
   aiEnabled?:      boolean
 }
 
-export default function PlanScreen({ legs, trip, profile, today, weatherMap, todayInsightNode, aiEnabled }: PlanScreenProps) {
+export default function PlanScreen({ legs, trip, today, weatherMap, todayInsightNode, aiEnabled }: PlanScreenProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const stripRef = useRef<HTMLDivElement>(null)
   const todayIndex = legs.findIndex(l => l.date === today)
@@ -61,7 +62,7 @@ export default function PlanScreen({ legs, trip, profile, today, weatherMap, tod
               {trip?.name ?? 'Spiti Valley'}
             </h1>
             <p className="font-mono text-xs text-text-muted mt-1">
-              {legs.length} days · {profile.display_name}
+              {legs.length} days · {trip?.name ?? 'Your trip'}
             </p>
           </div>
           {tripEnded ? (

@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { safeNext } from '@/lib/safe-next'
 
 type Mode = 'signin' | 'forgot'
 
-export default function LoginPage() {
+function LoginPageForm() {
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -14,6 +15,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Set by the auth proxy when it bounced an unauthenticated request. Validated
+  // rather than trusted: an unchecked `next` is an open redirect.
+  const destination = safeNext(searchParams.get('next'))
   const supabase = createClient()
 
   function switchMode(next: Mode) {
@@ -46,7 +51,7 @@ export default function LoginPage() {
       setError(err.message)
       setLoading(false)
     } else {
-      router.push('/')
+      router.push(destination)
       router.refresh()
     }
   }
@@ -144,5 +149,18 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+/**
+ * useSearchParams() opts a component out of static prerendering, and these pages
+ * are otherwise fully static. The Suspense boundary keeps the shell prerendered
+ * and lets only the form hydrate with the `next` parameter.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-bg" />}>
+      <LoginPageForm />
+    </Suspense>
   )
 }

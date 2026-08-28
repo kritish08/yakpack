@@ -154,3 +154,36 @@
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
+/* ── Landing page motion ────────────────────────────────────────────────────
+   The elevation profile draws itself on load; section content lifts in on
+   scroll via IntersectionObserver toggling [data-reveal]. Every animation here
+   is switched off wholesale under prefers-reduced-motion at the bottom. */
+
+@keyframes yp-draw   { to { stroke-dashoffset: 0 } }
+@keyframes yp-fade   { to { opacity: 1 } }
+@keyframes yp-rise   { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+
+.yp-profile-line {
+  stroke-dasharray: 3200;
+  stroke-dashoffset: 3200;
+  animation: yp-draw 1.8s cubic-bezier(0.22, 1, 0.36, 1) 0.25s forwards;
+}
+.yp-profile-area { opacity: 0; animation: yp-fade 1.2s ease-out 1.4s forwards }
+.yp-profile-dot  { opacity: 0; animation: yp-fade 0.4s ease-out forwards }
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-reveal='shown'] { opacity: 1; transform: none }
+
+.yp-hero-line { animation: yp-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both }
+
+@media (prefers-reduced-motion: reduce) {
+  .yp-profile-line { stroke-dashoffset: 0; animation: none }
+  .yp-profile-area,
+  .yp-profile-dot,
+  .yp-hero-line    { opacity: 1; animation: none; transform: none }
+  [data-reveal]    { opacity: 1; transform: none; transition: none }
+}

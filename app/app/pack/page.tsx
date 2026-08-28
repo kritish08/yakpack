@@ -2,10 +2,10 @@ import { getPackData } from '@/lib/pack'
 import PackScreen from '@/components/pack/pack-screen'
 
 export default async function PackPage() {
-  const { profile, categoriesWithItems, packed } = await getPackData()
+  const { ctx, categoriesWithItems, packed } = await getPackData()
   return (
     <PackScreen
-      profile={profile}
+      ctx={ctx}
       categoriesWithItems={categoriesWithItems}
       initialPacked={packed}
     />

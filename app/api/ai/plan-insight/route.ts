@@ -1,6 +1,8 @@
 import { generateText } from 'ai'
-import { AI_ENABLED, getAzureModel, PEMBA_SYSTEM } from '@/lib/ai'
+import { AI_ENABLED, modelForRequest, PEMBA_SYSTEM } from '@/lib/ai'
+import { isAdmin } from '@/lib/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getTripContext } from '@/lib/trip'
 import type { Database } from '@/lib/database.types'
 
 export const revalidate = 86400 // cache 24h per leg+date
@@ -9,6 +11,10 @@ type ItineraryRow = Database['public']['Tables']['itinerary']['Row']
 
 export async function GET(req: Request) {
   if (!AI_ENABLED) return Response.json({ error: 'AI not enabled' }, { status: 403 })
+
+  // Server key is admin-only; every other caller must bring their own.
+  const model = modelForRequest(req, await isAdmin())
+  if (!model) return Response.json({ error: 'NO_KEY' }, { status: 402 })
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -20,9 +26,12 @@ export async function GET(req: Request) {
     return Response.json({ error: 'Invalid day' }, { status: 400 })
   }
 
+  const { tripId } = await getTripContext()
+
   const { data: rawLeg } = await supabase
     .from('itinerary')
     .select('*')
+    .eq('trip_id', tripId)
     .eq('day', day)
     .single()
   const leg = rawLeg as ItineraryRow | null
@@ -33,6 +42,7 @@ export async function GET(req: Request) {
   const { data: rawPrev } = await supabase
     .from('itinerary')
     .select('altitude_m')
+    .eq('trip_id', tripId)
     .lt('day', day)
     .order('day', { ascending: false })
     .limit(1)
@@ -58,7 +68,7 @@ export async function GET(req: Request) {
 
   try {
     const { text } = await generateText({
-      model:  getAzureModel(),
+      model:  model,
       system: PEMBA_SYSTEM,
       prompt,
     })

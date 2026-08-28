@@ -1,8 +1,6 @@
-import { Suspense } from 'react'
 import { getPlanData } from '@/lib/plan'
 import { AI_ENABLED } from '@/lib/ai'
 import PlanScreen from '@/components/plan/plan-screen'
-import PlanAiInsight, { PlanAiInsightSkeleton } from '@/components/plan/plan-ai-insight'
 import type { LegWeather, Leg } from '@/lib/plan'
 
 async function fetchLegWeather(lat: number, lon: number): Promise<LegWeather | null> {
@@ -21,11 +19,6 @@ async function fetchLegWeather(lat: number, lon: number): Promise<LegWeather | n
   }
 }
 
-// Async server component that streams Pemba's insight for today's leg
-async function TodayInsightSlot({ leg, weather }: { leg: Leg; weather: LegWeather | null }) {
-  return <PlanAiInsight leg={leg} weather={weather} />
-}
-
 export default async function PlanPage() {
   const data = await getPlanData()
   const { legs, today } = data
@@ -41,22 +34,13 @@ export default async function PlanPage() {
   )
   const weatherMap: Record<number, LegWeather | null> = Object.fromEntries(weatherEntries)
 
-  const todayLeg = legs.find(l => l.date === today) ?? null
-  const todayWeather = todayLeg ? (weatherMap[todayLeg.day] ?? null) : null
-
-  // Pemba's AI insight for today's leg — Suspense-streamed independently
-  const todayInsightNode = AI_ENABLED && todayLeg ? (
-    <Suspense fallback={<PlanAiInsightSkeleton />}>
-      <TodayInsightSlot leg={todayLeg} weather={todayWeather} />
-    </Suspense>
-  ) : null
-
+  // Per-day insights are fetched client-side by DayCard so they can carry the
+  // caller's own OpenAI key; there is no separate server-rendered one.
   return (
     <PlanScreen
       {...data}
       weatherMap={weatherMap}
       aiEnabled={AI_ENABLED}
-      todayInsightNode={todayInsightNode}
     />
   )
 }

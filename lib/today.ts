@@ -1,60 +1,55 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
+import { getTripContext } from '@/lib/trip'
+import { stripJoin } from '@/lib/pack'
 import type { Database } from '@/lib/database.types'
 import type { WeatherData } from '@/lib/weather'
 
 export type Leg = Database['public']['Tables']['itinerary']['Row']
 export type Item = Database['public']['Tables']['items']['Row']
-type Profile = Database['public']['Tables']['profiles']['Row']
 
 export async function getTodayData() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: (c) => c.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  const ctx = await getTripContext()
+  const supabase = await createClient()
 
   const today = new Date().toISOString().slice(0, 10)
 
-  const [legsRes, itemsRes, profileRes, packedRes] = await Promise.all([
-    supabase.from('itinerary').select('*').order('day'),
-    supabase.from('items').select('*'),
-    supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('packed').select('item_id, user_key'),
+  const [legsRes, itemsRes, packedRes] = await Promise.all([
+    supabase.from('itinerary').select('*').eq('trip_id', ctx.tripId).order('day'),
+    supabase.from('items').select('*').eq('trip_id', ctx.tripId),
+    supabase
+      .from('packed')
+      .select('item_id, user_key, packed, packed_at, items!inner(trip_id)')
+      .eq('items.trip_id', ctx.tripId),
   ])
 
-  const legs    = (legsRes.data    ?? []) as Leg[]
-  const items   = (itemsRes.data   ?? []) as Item[]
-  const profile = profileRes.data! as Profile
-  // Only count items packed from the current user's perspective: their own
-  // per-person rows plus shared rows. Without this filter, an item shows as
-  // packed if EITHER user packed it.
-  const myKeys = new Set<string>([profile.role, 'shared'])
+  const legs  = (legsRes.data  ?? []) as Leg[]
+  const items = (itemsRes.data ?? []) as Item[]
+
+  // Count an item packed only from THIS member's perspective: their own rows
+  // plus shared ones. Without the filter an item reads as packed when either
+  // person has packed it.
+  const myKeys = new Set<string>([ctx.memberKey, 'shared'])
   const packedIds = new Set(
-    (packedRes.data ?? [])
-      .filter((r: { user_key: string }) => myKeys.has(r.user_key))
-      .map((r: { item_id: string }) => r.item_id)
+    stripJoin(packedRes.data)
+      .filter(r => myKeys.has(r.user_key))
+      .map(r => r.item_id),
   )
 
-  // Find today's leg; if before trip show Day 1 preview; if after trip show last day
+  // Before departure show Day 1 as a preview; after the trip show the last day.
   const todayLeg: Leg | undefined =
     legs.find(l => l.date === today) ??
     (today < (legs[0]?.date ?? '') ? legs[0] : legs[legs.length - 1]) ??
     legs[0]
 
-  const isToday = todayLeg?.date === today
+  const isToday  = todayLeg?.date === today
   const isFuture = todayLeg?.date ? today < todayLeg.date : false
-  const isPast = todayLeg?.date ? today > todayLeg.date : false
+  const isPast   = todayLeg?.date ? today > todayLeg.date : false
 
-  return { todayLeg, legs, items, profile, packedIds, isToday, isFuture, isPast }
+  return { todayLeg, legs, items, ctx, packedIds, isToday, isFuture, isPast }
 }
 
-// Calls Open-Meteo directly — avoids SSRF from trusting Host header to build an internal URL.
-// The /api/weather route handler exists for client-side fetches; server components skip it.
+// Calls Open-Meteo directly — avoids SSRF from trusting the Host header to build
+// an internal URL. The /api/weather route exists for client-side fetches.
 export async function fetchWeather(lat: number, lon: number): Promise<WeatherData | null> {
   try {
     const url = new URL('https://api.open-meteo.com/v1/forecast')

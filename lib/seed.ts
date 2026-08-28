@@ -31,7 +31,7 @@ export interface ItemInsert {
   category_sort_order: number
   name: string
   status: 'owned' | 'to_buy' | 'standard'
-  assigned_to: 'kritish' | 'partner' | 'shared'
+  assigned_to: 'organiser' | 'partner_1' | 'partner_2' | 'shared'
   scope: 'each' | 'shared'
   carry_tags: string[]
   sort_order: number
@@ -60,10 +60,12 @@ interface TripInsert {
   id: number
   name: string
   depart_date: string
-  coordinator_name: string
-  coordinator_phone: string
-  leader_name: string
-  leader_phone: string
+  // Contact fields are nullable: they hold third-party details supplied via env
+  // and are simply absent in a fresh clone.
+  coordinator_name: string | null
+  coordinator_phone: string | null
+  leader_name: string | null
+  leader_phone: string | null
 }
 
 // ─── Parsing helpers ──────────────────────────────────────────────────────────
@@ -163,15 +165,20 @@ export function parsePackingList(content: string): {
     }
   }
 
-  // ── Hardcoded trip row (from Trip Meta section) ───────────────────────────
+  // ── Trip row ──────────────────────────────────────────────────────────────
+  // Contact details belong to third parties (the tour operator and the
+  // on-ground leader), so they are read from the environment rather than
+  // committed to a public repo. Absent env vars simply leave the fields null and
+  // the Settings screen hides the corresponding `tel:` link.
   const trip: TripInsert = {
     id: 1,
-    name: 'Experience Spiti Valley (Ex-Delhi) — Kinnaur · Spiti · Chandratal',
-    depart_date: '2026-06-19',
-    coordinator_name: 'Ritvik',
-    coordinator_phone: '[redacted]',
-    leader_name: 'Sashi',
-    leader_phone: '[redacted]',
+    name: process.env.TRIP_NAME
+      ?? 'Experience Spiti Valley (Ex-Delhi) — Kinnaur · Spiti · Chandratal',
+    depart_date: process.env.TRIP_DEPART_DATE ?? '2026-06-19',
+    coordinator_name:  process.env.TRIP_COORDINATOR_NAME  ?? null,
+    coordinator_phone: process.env.TRIP_COORDINATOR_PHONE ?? null,
+    leader_name:       process.env.TRIP_LEADER_NAME       ?? null,
+    leader_phone:      process.env.TRIP_LEADER_PHONE      ?? null,
   }
 
   return { categories, items, trip }
@@ -389,24 +396,66 @@ async function main() {
 
   console.log('YakPack seeding...\n')
 
-  // ── 1. Delete existing data (idempotent: delete-then-reinsert) ────────────
-  console.log('Clearing existing data...')
-  const deletes: Array<{ table: string; error: unknown }> = [
-    { table: 'packed',    error: (await supabase.from('packed').delete().neq('item_id', '00000000-0000-0000-0000-000000000000')).error },
-    { table: 'items',     error: (await supabase.from('items').delete().neq('id', '00000000-0000-0000-0000-000000000000')).error },
-    { table: 'categories',error: (await supabase.from('categories').delete().neq('id', 0)).error },
-    { table: 'itinerary', error: (await supabase.from('itinerary').delete().neq('day', 0)).error },
-    { table: 'trip',      error: (await supabase.from('trip').delete().eq('id', 1)).error },
-  ]
-  for (const { table, error } of deletes) {
+  // ── 1. Resolve the template trip ──────────────────────────────────────────
+  //
+  // The seed maintains the TEMPLATE trip only — the row every new registration
+  // is copied from. It must never touch a real user's trip, so every delete and
+  // insert below is filtered on this id. Without that filter the old
+  // `.neq(...)` deletes would wipe every account's data.
+  console.log('Resolving template trip...')
+  const { data: existingTemplate, error: tplReadError } = await supabase
+    .from('trips')
+    .select('id')
+    .eq('is_template', true)
+    .order('created_at')
+    .limit(1)
+    .maybeSingle()
+  if (tplReadError) { console.error('ERROR reading template trip:', tplReadError); process.exit(1) }
+
+  let templateId = (existingTemplate as { id: string } | null)?.id ?? null
+
+  if (templateId) {
+    const { error } = await supabase
+      .from('trips')
+      .update({
+        name: trip.name,
+        depart_date: trip.depart_date,
+        coordinator_name: trip.coordinator_name,
+        coordinator_phone: trip.coordinator_phone,
+        leader_name: trip.leader_name,
+        leader_phone: trip.leader_phone,
+      })
+      .eq('id', templateId)
+    if (error) { console.error('ERROR updating template trip:', error); process.exit(1) }
+  } else {
+    const { data, error } = await supabase
+      .from('trips')
+      .insert({ ...trip, is_template: true })
+      .select('id')
+      .single()
+    if (error || !data) { console.error('ERROR creating template trip:', error); process.exit(1) }
+    templateId = (data as { id: string }).id
+  }
+  console.log(`  template trip: ${templateId}`)
+
+  // ── 2. Clear the template's content (scoped — never other trips) ──────────
+  console.log('Clearing template content...')
+  const { data: oldItems } = await supabase.from('items').select('id').eq('trip_id', templateId)
+  const oldItemIds = ((oldItems ?? []) as { id: string }[]).map(i => i.id)
+  if (oldItemIds.length > 0) {
+    const { error } = await supabase.from('packed').delete().in('item_id', oldItemIds)
+    if (error) { console.error('ERROR clearing packed:', error); process.exit(1) }
+  }
+  for (const table of ['items', 'categories', 'itinerary'] as const) {
+    const { error } = await supabase.from(table).delete().eq('trip_id', templateId)
     if (error) { console.error(`ERROR clearing ${table}:`, error); process.exit(1) }
   }
 
-  // ── 2. Insert categories ──────────────────────────────────────────────────
+  // ── 3. Insert categories ──────────────────────────────────────────────────
   console.log(`Inserting ${categories.length} categories...`)
   const { data: insertedCategories, error: catError } = await supabase
     .from('categories')
-    .insert(categories.map((c) => ({ name: c.name, sort_order: c.sort_order, icon: c.icon })))
+    .insert(categories.map((c) => ({ trip_id: templateId, name: c.name, sort_order: c.sort_order, icon: c.icon })))
     .select('id, sort_order')
 
   if (catError) {
@@ -420,9 +469,10 @@ async function main() {
     categoryIdMap.set(cat.sort_order, cat.id)
   }
 
-  // ── 3. Insert items ───────────────────────────────────────────────────────
+  // ── 4. Insert items ───────────────────────────────────────────────────────
   console.log(`Inserting ${items.length} items...`)
   const itemRows = items.map((item) => ({
+    trip_id: templateId,
     category_id: categoryIdMap.get(item.category_sort_order)!,
     name: item.name,
     status: item.status,
@@ -445,16 +495,12 @@ async function main() {
     process.exit(1)
   }
 
-  // ── 4. Insert packed rows ─────────────────────────────────────────────────
+  // ── 5. Insert packed rows ─────────────────────────────────────────────────
   console.log(`Inserting ${packedCount} packed rows...`)
   const packedRows: Array<{ item_id: string; user_key: string; packed: boolean }> = []
-
-  // We need to pair items with their scope. Re-build the pairing:
-  // insertedItems is in the same order as itemRows (and items[]).
-  for (let i = 0; i < (insertedItems ?? []).length; i++) {
-    const inserted = insertedItems![i]
+  for (const inserted of insertedItems ?? []) {
     if (inserted.scope === 'each') {
-      packedRows.push({ item_id: inserted.id, user_key: 'kritish', packed: false })
+      packedRows.push({ item_id: inserted.id, user_key: 'organiser', packed: false })
       packedRows.push({ item_id: inserted.id, user_key: 'partner', packed: false })
     } else {
       packedRows.push({ item_id: inserted.id, user_key: 'shared', packed: false })
@@ -467,19 +513,13 @@ async function main() {
     process.exit(1)
   }
 
-  // ── 5. Insert itinerary ───────────────────────────────────────────────────
+  // ── 6. Insert itinerary ───────────────────────────────────────────────────
   console.log(`Inserting ${itineraryRows.length} itinerary rows...`)
-  const { error: itenError } = await supabase.from('itinerary').insert(itineraryRows)
+  const { error: itenError } = await supabase
+    .from('itinerary')
+    .insert(itineraryRows.map(r => ({ ...r, trip_id: templateId })))
   if (itenError) {
     console.error('ERROR inserting itinerary:', itenError)
-    process.exit(1)
-  }
-
-  // ── 6. Insert trip row ────────────────────────────────────────────────────
-  console.log('Inserting trip row...')
-  const { error: tripError } = await supabase.from('trip').insert(trip)
-  if (tripError) {
-    console.error('ERROR inserting trip:', tripError)
     process.exit(1)
   }
 
@@ -488,7 +528,7 @@ async function main() {
   console.log(`  Items:          ${items.length}`)
   console.log(`  Packed rows:    ${packedCount}`)
   console.log(`  Itinerary days: ${itineraryRows.length}`)
-  console.log(`  Trip row:       1`)
+  console.log(`  Template trip:  ${templateId}`)
 }
 
 // Only run the destructive seed when this file is executed directly

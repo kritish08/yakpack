@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { updateItem, deleteItem } from '@/app/actions/items'
 import type { Item } from '@/lib/pack'
+import type { AssignedTo, ItemScope, ItemStatus, MemberKey } from '@/lib/database.types'
 
 interface EditItemSheetProps {
   item: Item | null
-  role: 'kritish' | 'partner'
+  role: MemberKey
   onClose: () => void
   onSaved?: (itemId: string, changes: Partial<Item>) => void
   onDeleted?: (itemId: string) => void
@@ -21,8 +22,8 @@ export default function EditItemSheet({ item, role, onClose, onSaved, onDeleted 
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
-  const [status, setStatus] = useState<'owned' | 'to_buy' | 'standard'>('standard')
-  const [assignedTo, setAssignedTo] = useState<'kritish' | 'partner' | 'shared'>('shared')
+  const [status, setStatus] = useState<ItemStatus>('standard')
+  const [assignedTo, setAssignedTo] = useState<AssignedTo>('shared')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -38,7 +39,7 @@ export default function EditItemSheet({ item, role, onClose, onSaved, onDeleted 
 
   if (!item) return null
 
-  const scope: 'each' | 'shared' = assignedTo === 'shared' ? 'shared' : 'each'
+  const scope: ItemScope = assignedTo === 'shared' ? 'shared' : 'each'
 
   async function handleSave() {
     if (!item || !name.trim()) return

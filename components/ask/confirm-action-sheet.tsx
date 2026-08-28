@@ -11,7 +11,7 @@ export interface UpdateItemInput {
     name?: string
     qty?: string | null
     status?: 'owned' | 'to_buy' | 'standard'
-    assigned_to?: 'kritish' | 'partner' | 'shared'
+    assigned_to?: 'organiser' | 'partner_1' | 'partner_2' | 'shared'
     category_id?: number
   }
   reason: string
@@ -42,7 +42,7 @@ const statusLabel: Record<string, string> = {
 }
 
 const assignedLabel: Record<string, string> = {
-  kritish: 'Kritish',
+  owner: 'You',
   partner: 'Partner',
   shared: 'Both',
 }

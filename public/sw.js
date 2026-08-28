@@ -1,8 +1,9 @@
 // YakPack service worker — offline-first for a no-signal trip.
 //
 // Strategy:
-//   - App pages (navigations): network-first, fall back to the last cached copy
-//     of that page, then any cached page, then the /offline shell.
+//   - RSC navigation payloads: NEVER cached (see isRscRequest below).
+//   - App pages (document navigations): network-first, fall back to the last
+//     cached copy of that page, then the /offline shell.
 //   - Next static assets: cache-first (immutable, hashed names).
 //   - Supabase REST reads (GET /rest/v1/*): network-first with cache fallback,
 //     so the last-known packing list / itinerary / progress are readable offline.
@@ -10,7 +11,7 @@
 //   - Weather: network-first with stale fallback.
 //   - Other /api/* (AI etc.): network-only.
 
-const CACHE_VERSION = 'yakpack-v3'
+const CACHE_VERSION = 'yakpack-v4'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 const PAGE_CACHE = `${CACHE_VERSION}-pages`
 const DATA_CACHE = `${CACHE_VERSION}-data`
@@ -48,6 +49,21 @@ function isSupabase(url) {
   return url.hostname.endsWith('.supabase.co')
 }
 
+// Next.js App Router client-side navigation is NOT a document navigation — it is
+// a plain fetch carrying an `RSC: 1` header and a `?_rsc=<hash>` cache-busting
+// param, so `request.mode === 'navigate'` is false for it.
+//
+// These must never be cached:
+//   1. `_rsc` is a deterministic hash of the router state (not a nonce), so a
+//      cached entry is replayed forever and the screen goes permanently stale
+//      even while online — silently defeating revalidatePath().
+//   2. When an RSC fetch fails, Next reverts to a full-page (MPA) navigation,
+//      which the document-navigation handler below serves from PAGE_CACHE.
+//      Letting it fail is exactly what makes offline navigation work.
+function isRscRequest(request, url) {
+  return request.headers.get('RSC') === '1' || url.searchParams.has('_rsc')
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
@@ -55,6 +71,9 @@ self.addEventListener('fetch', (event) => {
   // Only handle GET over http(s). Websockets (realtime) and writes pass through.
   if (request.method !== 'GET') return
   if (!url.protocol.startsWith('http')) return
+
+  // ── RSC navigation payloads: network-only, always ───────────────────────────
+  if (isRscRequest(request, url)) return
 
   // ── Supabase ────────────────────────────────────────────────────────────────
   if (isSupabase(url)) {
@@ -75,13 +94,13 @@ self.addEventListener('fetch', (event) => {
   // ── Other API routes (AI, auth callback): network-only ───────────────────────
   if (url.pathname.startsWith('/api/')) return
 
-  // ── Next static assets: cache-first ──────────────────────────────────────────
+  // ── Next static assets: cache-first (immutable, content-hashed) ──────────────
   if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/')) {
     event.respondWith(cacheFirst(request, STATIC_CACHE))
     return
   }
 
-  // ── Page navigations: network-first with cached-page → offline fallback ──────
+  // ── Document navigations: network-first → cached page → offline shell ────────
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -95,6 +114,7 @@ self.addEventListener('fetch', (event) => {
         .catch(async () => {
           return (
             (await caches.match(request)) ||
+            (await caches.match(request, { ignoreSearch: true })) ||
             (await caches.match('/offline')) ||
             Response.error()
           )
@@ -103,9 +123,11 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // ── Everything else same-origin: try cache, then network ─────────────────────
+  // ── Everything else same-origin: network-first, cache only as a fallback ─────
+  // Deliberately NOT cache-first: this branch catches dynamic same-origin GETs,
+  // and serving those from cache ahead of the network is how stale data creeps in.
   if (url.origin === self.location.origin) {
-    event.respondWith(cacheFirst(request, STATIC_CACHE))
+    event.respondWith(networkFirst(request, STATIC_CACHE))
   }
 })
 
@@ -113,13 +135,18 @@ self.addEventListener('fetch', (event) => {
 // can't grow unbounded over a multi-week trip and get the whole origin evicted.
 const CACHE_LIMITS = { [DATA_CACHE]: 80, [PAGE_CACHE]: 30 }
 async function putCapped(cacheName, request, response) {
-  const cache = await caches.open(cacheName)
-  await cache.put(request, response)
-  const limit = CACHE_LIMITS[cacheName]
-  if (!limit) return
-  const keys = await cache.keys()
-  if (keys.length > limit) {
-    for (const k of keys.slice(0, keys.length - limit)) await cache.delete(k)
+  try {
+    const cache = await caches.open(cacheName)
+    await cache.put(request, response)
+    const limit = CACHE_LIMITS[cacheName]
+    if (!limit) return
+    const keys = await cache.keys()
+    if (keys.length > limit) {
+      for (const k of keys.slice(0, keys.length - limit)) await cache.delete(k)
+    }
+  } catch {
+    // Quota exceeded or cache unavailable — never let this reject into the
+    // fetch handler and turn a served response into a network error.
   }
 }
 
@@ -146,7 +173,7 @@ async function cacheFirst(request, cacheName) {
     const res = await fetch(request)
     if (res.ok) {
       const clone = res.clone()
-      caches.open(cacheName).then((c) => c.put(request, clone))
+      putCapped(cacheName, request, clone)
     }
     return res
   } catch {
