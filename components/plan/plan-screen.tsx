@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import type { Leg, Trip, LegWeather } from '@/lib/plan'
-import type { MemberView } from '@/lib/database.types'
+import type { MemberView, TripContact } from '@/lib/database.types'
 import { amsRisk } from '@/lib/ams'
 import DayCard from './day-card'
 import ImportPlan from './import-plan'
 
 interface PlanScreenProps {
   legs:            Leg[]
+  contacts:        TripContact[]
   trip:            Trip | null
   ctx:             MemberView
   isOrganiser?:    boolean
@@ -18,7 +19,7 @@ interface PlanScreenProps {
   aiEnabled?:      boolean
 }
 
-export default function PlanScreen({ legs, trip, today, weatherMap, todayInsightNode, aiEnabled, isOrganiser }: PlanScreenProps) {
+export default function PlanScreen({ legs, contacts, trip, today, weatherMap, todayInsightNode, aiEnabled, isOrganiser }: PlanScreenProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const stripRef = useRef<HTMLDivElement>(null)
   const todayIndex = legs.findIndex(l => l.date === today)
@@ -83,7 +84,7 @@ export default function PlanScreen({ legs, trip, today, weatherMap, todayInsight
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text leading-none">
-              {trip?.name ?? 'Spiti Valley'}
+              {trip?.name ?? 'Your trip'}
             </h1>
             <p className="font-mono text-xs text-text-muted mt-1">
               {legs.length === 0 ? 'No plan yet' : `${legs.length} day${legs.length === 1 ? '' : 's'}`}
@@ -104,22 +105,36 @@ export default function PlanScreen({ legs, trip, today, weatherMap, todayInsight
           )}
         </div>
 
-        {/* Emergency contacts */}
-        {trip && (trip.coordinator_name || trip.leader_name) && (
+        {/* Trip contacts — as many as the trip has, each with its own role. */}
+        {contacts.length > 0 && (
           <div className="mt-4 bg-surface border border-border rounded-xl px-4 py-3 flex flex-col gap-2">
-            <p className="font-mono text-[10px] text-text-muted uppercase tracking-wider">Emergency contacts</p>
-            {trip.coordinator_name && (
-              <a href={`tel:${trip.coordinator_phone}`} className="flex items-center justify-between group">
-                <span className="font-body text-sm text-text">{trip.coordinator_name}</span>
-                <span className="font-mono text-xs text-accent group-active:opacity-70">{trip.coordinator_phone}</span>
-              </a>
-            )}
-            {trip.leader_name && (
-              <a href={`tel:${trip.leader_phone}`} className="flex items-center justify-between group border-t border-border/40 pt-2">
-                <span className="font-body text-sm text-text">{trip.leader_name}</span>
-                <span className="font-mono text-xs text-accent group-active:opacity-70">{trip.leader_phone}</span>
-              </a>
-            )}
+            <p className="font-mono text-[10px] text-text-muted uppercase tracking-wider">Contacts</p>
+            {contacts.map((c, i) => {
+              const label = c.name || c.role
+              // A contact with no number is still worth showing — a name and a
+              // note ("permit office, Reckong Peo") is useful on its own — so
+              // only the ones that can actually be dialled become links.
+              const Row = c.phone ? 'a' : 'div'
+              return (
+                <Row
+                  key={c.id}
+                  {...(c.phone ? { href: `tel:${c.phone.replace(/\s+/g, '')}` } : {})}
+                  className={`flex items-start justify-between gap-3 group ${i > 0 ? 'border-t border-border/40 pt-2' : ''}`}
+                >
+                  <span className="min-w-0">
+                    <span className="font-body text-sm text-text block truncate">{label}</span>
+                    <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider block truncate">
+                      {c.name ? c.role : ''}{c.name && c.note ? ' · ' : ''}{c.note ?? ''}
+                    </span>
+                  </span>
+                  {c.phone && (
+                    <span className="font-mono text-xs text-accent group-active:opacity-70 shrink-0 pt-0.5">
+                      {c.phone}
+                    </span>
+                  )}
+                </Row>
+              )
+            })}
           </div>
         )}
       </div>

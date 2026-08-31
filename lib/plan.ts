@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getTripContext } from '@/lib/trip'
+import { getTripContacts, getTripContext } from '@/lib/trip'
 import type { Database } from '@/lib/database.types'
 
 export type Leg = Database['public']['Tables']['itinerary']['Row']
@@ -16,14 +16,13 @@ export async function getPlanData() {
   const ctx = await getTripContext()
   const supabase = await createClient()
 
-  const { data } = await supabase
-    .from('itinerary')
-    .select('*')
-    .eq('trip_id', ctx.tripId)
-    .order('day')
+  const [legsRes, contacts] = await Promise.all([
+    supabase.from('itinerary').select('*').eq('trip_id', ctx.tripId).order('day'),
+    getTripContacts(ctx.tripId),
+  ])
 
-  const legs = (data ?? []) as Leg[]
+  const legs = (legsRes.data ?? []) as Leg[]
   const today = new Date().toISOString().slice(0, 10)
 
-  return { legs, trip: ctx.trip, ctx, today }
+  return { legs, contacts, trip: ctx.trip, ctx, today }
 }

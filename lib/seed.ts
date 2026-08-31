@@ -58,13 +58,15 @@ interface ItineraryInsert {
 
 interface TripInsert {
   name: string
-  depart_date: string
-  // Contact fields are nullable: they hold third-party details supplied via env
-  // and are simply absent in a fresh clone.
-  coordinator_name: string | null
-  coordinator_phone: string | null
-  leader_name: string | null
-  leader_phone: string | null
+  depart_date: string | null
+}
+
+interface ContactInsert {
+  role: string
+  name: string | null
+  phone: string | null
+  note: string | null
+  sort_order: number
 }
 
 // ─── Parsing helpers ──────────────────────────────────────────────────────────
@@ -79,13 +81,40 @@ const SKIP_SECTIONS = new Set([
 ])
 
 /**
+ * Rows of a pipe table under a given `## Heading`, as trimmed cell arrays.
+ *
+ * The header row and its `|---|---|` separator are dropped, so the caller gets
+ * data only. Returns [] when the heading is absent — a trip file is allowed to
+ * omit a section it has nothing to say about.
+ */
+function tableUnder(content: string, heading: string): string[][] {
+  const section = content.split(/^## /m).find(s => s.trimStart().startsWith(heading))
+  if (!section) return []
+
+  return section
+    .split('\n')
+    .filter(l => l.trimStart().startsWith('|'))
+    .map(l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim()))
+    .filter(cells => !cells.every(c => /^:?-{2,}:?$/.test(c)))
+    .slice(1)
+}
+
+/** A table cell that is blank, or a placeholder standing in for a blank. */
+function cellOrNull(raw: string | undefined): string | null {
+  const v = (raw ?? '').replace(/^_+|_+$/g, '').trim()
+  if (!v || v === '—' || v === '-' || /^\(.*\)$/.test(v)) return null
+  return v
+}
+
+/**
  * Parse docs/01_packing_list_master.md
- * Returns { categories, items, trip }
+ * Returns { categories, items, trip, contacts }
  */
 export function parsePackingList(content: string): {
   categories: CategoryInsert[]
   items: ItemInsert[]
   trip: TripInsert
+  contacts: ContactInsert[]
 } {
   const lines = content.split('\n')
   const categories: CategoryInsert[] = []
@@ -165,21 +194,35 @@ export function parsePackingList(content: string): {
   }
 
   // ── Trip row ──────────────────────────────────────────────────────────────
-  // Contact details belong to third parties (the tour operator and the
-  // on-ground leader), so they are read from the environment rather than
-  // committed to a public repo. Absent env vars simply leave the fields null and
-  // the Settings screen hides the corresponding `tel:` link.
+  //
+  // Read from the document's own Trip Meta table rather than from env: the file
+  // is the trip, so a second trip is a second file, not a second set of
+  // variables. TRIP_NAME / TRIP_DEPART_DATE still win when set, which is how a
+  // private deployment keeps its details out of a public repo.
+  const meta = new Map(tableUnder(content, 'Trip Meta').map(r => [r[0].toLowerCase(), r[1] ?? '']))
   const trip: TripInsert = {
-    name: process.env.TRIP_NAME
-      ?? 'Experience Spiti Valley (Ex-Delhi) — Kinnaur · Spiti · Chandratal',
-    depart_date: process.env.TRIP_DEPART_DATE ?? '2026-06-19',
-    coordinator_name:  process.env.TRIP_COORDINATOR_NAME  ?? null,
-    coordinator_phone: process.env.TRIP_COORDINATOR_PHONE ?? null,
-    leader_name:       process.env.TRIP_LEADER_NAME       ?? null,
-    leader_phone:      process.env.TRIP_LEADER_PHONE      ?? null,
+    name: process.env.TRIP_NAME || cellOrNull(meta.get('trip')) || 'Untitled trip',
+    depart_date: process.env.TRIP_DEPART_DATE || cellOrNull(meta.get('depart date')),
   }
 
-  return { categories, items, trip }
+  // ── Contacts ──────────────────────────────────────────────────────────────
+  //
+  // Rows with a role but no name and no number are the format showing its shape
+  // — that is what the committed file holds, because these details belong to
+  // third parties and are not ours to publish. They are skipped rather than
+  // seeded as blanks, so a fresh clone starts with an empty contact list the
+  // organiser fills in from the app.
+  const contacts: ContactInsert[] = []
+  for (const cells of tableUnder(content, 'Trip Contacts')) {
+    const role  = cellOrNull(cells[0])
+    const name  = cellOrNull(cells[1])
+    const phone = cellOrNull(cells[2])
+    const note  = cellOrNull(cells[3])
+    if (!role || (!name && !phone)) continue
+    contacts.push({ role, name, phone, note, sort_order: contacts.length })
+  }
+
+  return { categories, items, trip, contacts }
 }
 
 /**
@@ -339,7 +382,7 @@ async function main() {
   const itineraryContent = fs.readFileSync(itineraryPath, 'utf-8')
 
   // Parse
-  const { categories, items, trip } = parsePackingList(packingListContent)
+  const { categories, items, trip, contacts } = parsePackingList(packingListContent)
   const itineraryRows = parseItinerary(itineraryContent)
 
   // Count packed rows
@@ -354,6 +397,7 @@ async function main() {
   console.log(`Items:          ${items.length}`)
   console.log(`Packed rows:    ${packedCount}`)
   console.log(`Itinerary days: ${itineraryRows.length}`)
+  console.log(`Contacts:       ${contacts.length}`)
   console.log(`Template trip:  1`)
   console.log()
 
@@ -373,6 +417,11 @@ async function main() {
       console.log(
         `  Day ${row.day}: ${row.leg.slice(0, 60)} | lat=${row.lat}, lon=${row.lon} | alt=${row.altitude_m}m | net=${row.network}`,
       )
+    }
+    if (contacts.length > 0) {
+      console.log()
+      console.log('--- Contacts ---')
+      for (const c of contacts) console.log(`  ${c.role}: ${c.name ?? '—'} ${c.phone ?? ''}`.trimEnd())
     }
     console.log()
     console.log('Dry run complete. No changes written to DB.')
@@ -415,14 +464,7 @@ async function main() {
   if (templateId) {
     const { error } = await supabase
       .from('trips')
-      .update({
-        name: trip.name,
-        depart_date: trip.depart_date,
-        coordinator_name: trip.coordinator_name,
-        coordinator_phone: trip.coordinator_phone,
-        leader_name: trip.leader_name,
-        leader_phone: trip.leader_phone,
-      })
+      .update({ name: trip.name, depart_date: trip.depart_date })
       .eq('id', templateId)
     if (error) { console.error('ERROR updating template trip:', error); process.exit(1) }
   } else {
@@ -444,7 +486,7 @@ async function main() {
     const { error } = await supabase.from('packed').delete().in('item_id', oldItemIds)
     if (error) { console.error('ERROR clearing packed:', error); process.exit(1) }
   }
-  for (const table of ['items', 'categories', 'itinerary'] as const) {
+  for (const table of ['items', 'categories', 'itinerary', 'trip_contacts'] as const) {
     const { error } = await supabase.from(table).delete().eq('trip_id', templateId)
     if (error) { console.error(`ERROR clearing ${table}:`, error); process.exit(1) }
   }
@@ -523,11 +565,24 @@ async function main() {
     process.exit(1)
   }
 
+  // ── 7. Insert contacts ────────────────────────────────────────────────────
+  if (contacts.length > 0) {
+    console.log(`Inserting ${contacts.length} contacts...`)
+    const { error: contactError } = await supabase
+      .from('trip_contacts')
+      .insert(contacts.map(c => ({ ...c, trip_id: templateId })))
+    if (contactError) {
+      console.error('ERROR inserting contacts:', contactError)
+      process.exit(1)
+    }
+  }
+
   console.log('\nSeeding complete!')
   console.log(`  Categories:     ${categories.length}`)
   console.log(`  Items:          ${items.length}`)
   console.log(`  Packed rows:    ${packedCount}`)
   console.log(`  Itinerary days: ${itineraryRows.length}`)
+  console.log(`  Contacts:       ${contacts.length}`)
   console.log(`  Template trip:  ${templateId}`)
 }
 

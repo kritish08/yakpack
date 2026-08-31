@@ -147,6 +147,7 @@ Summary · Plan · Ask (Ask is absent entirely when AI is off — never degraded
 |---|---|
 | `trips` | One row per trip. `is_template` marks the row new signups are copied from |
 | `trip_members` | `(trip_id, user_id, member_key)`; `member_key` is `'owner'` or `'partner'`, unique per trip |
+| `trip_contacts` | `trip_id` scoped; free-text `role` + name/phone/note. Any number per trip |
 | `profiles` | Display name and colour only — **there is no global role column** |
 | `categories` | `trip_id` scoped; `sort_order` drives display order |
 | `items` | `trip_id` scoped · `status` · `assigned_to` (`owner`/`partner`/`shared`) · `scope` |
@@ -198,6 +199,16 @@ while a different user with the same token is still refused.
 
 Removing a partner deletes their `packed` rows: `user_key` holds a slot, not a user
 id, so leaving them would silently hand their progress to whoever fills that slot next.
+
+**Trip contacts** are rows, not columns. `trips` used to carry
+`coordinator_name/phone` and `leader_name/phone` — the org chart of the one tour
+package this app was built around. A self-drive trip has neither; a trek has a
+guide and a permit office. So `trip_contacts` holds any number per trip, each with
+a free-text `role`. Read for members, write for the organiser, same as `itinerary`.
+
+The rule for copying: **the packing list copies from the template in both creation
+paths; route data — itinerary and contacts — copies only in the signup bootstrap.**
+A trip you create yourself starts with your own days and your own numbers.
 
 **Registration** calls `create_trip_from_template()`, which copies the template trip's
 categories, items, packed rows and itinerary atomically. It is idempotent — a retried
@@ -290,11 +301,10 @@ OPENAI_MODEL=gpt-5.6-luna       # override to swap models without a deploy
 # OPENAI_USE_RESPONSES=false    # fall back to chat completions
 # OPENAI_BASE_URL=              # only for an OpenAI-compatible gateway
 
-# Trip contacts belong to third parties and are NOT committed — the seed reads them
-TRIP_COORDINATOR_NAME=
-TRIP_COORDINATOR_PHONE=
-TRIP_LEADER_NAME=
-TRIP_LEADER_PHONE=
+# Optional seed overrides. Name and departure otherwise come from the Trip Meta
+# table in docs/01. Contacts are rows in `trip_contacts`, not env vars.
+TRIP_NAME=
+TRIP_DEPART_DATE=
 ```
 
 ## Before making the repo public

@@ -8,26 +8,34 @@
 
 ## Trip Meta
 
+Two fields are read by the seeder: **Trip** becomes the trip name, **Depart date**
+becomes `trips.depart_date` and must be `YYYY-MM-DD`. Everything else in this table
+is context for whoever is packing.
+
 | Field | Value |
 |---|---|
 | Trip | Experience Spiti Valley (Ex-Delhi) — Kinnaur · Spiti · Chandratal |
+| Depart date | 2026-06-19 |
 | Operator | Zostel / Zotrip |
 | Duration | 9 days |
-| Departure | June 19 |
 | Conditions | 0–20 °C, intense high-altitude UV, very dry air, freezing nights |
 | Laundry | None — pack for the full trip |
 | Network | Patchy (Jio/BSNL in pockets) — download everything offline first |
 
 ## Trip Contacts
 
-| Role | Name | Phone |
-|---|---|---|
-| Trip Coordinator / POC (tour operator) | _(set via env)_ | _(set via env)_ |
-| Trip Leader (on-ground) | _(set via env)_ | _(set via env)_ |
+| Role | Name | Phone | Note |
+|---|---|---|---|
+| Trip coordinator | | | Tour operator's point of contact |
+| Trip leader | | | On the ground, day to day |
 
-> Real contact details are intentionally **not** committed — they belong to third
-> parties. The seed script reads them from `TRIP_COORDINATOR_*` / `TRIP_LEADER_*`
-> environment variables. See `.env.example`.
+`Role` is free text — a self-drive trip has a homestay and a mechanic, a trek has a
+guide and a permit office. Add as many rows as the trip needs.
+
+> Name and phone are blank on purpose. They belong to third parties and are not
+> ours to publish, and a row with no name and no number is **skipped** by the
+> seeder rather than inserted as an empty contact. Fill them in on a private
+> deployment, or add them from Settings → Contacts once the app is running.
 
 ---
 

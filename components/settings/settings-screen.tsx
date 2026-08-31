@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import ByokSection from './byok-section'
 import AdminPanel from './admin-panel'
 import PartnersSection from './partners-section'
+import ContactsSection from './contacts-section'
 import type { AppRole, Database, MemberKey } from '@/lib/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -252,6 +253,7 @@ export default function SettingsScreen({ profile, userEmail, memberKey, appRole 
       <ProfileCard profile={profile} userEmail={userEmail} memberKey={memberKey} />
       <PasswordSection />
       <PartnersSection />
+      <ContactsSection isOrganiser={memberKey === 'organiser'} />
       <ByokSection isAdmin={appRole === 'admin'} />
       {appRole === 'admin' && <AdminPanel />}
       <PreferencesSection />

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Database, MemberKey, TripMemberView, TripSummary } from '@/lib/database.types'
+import type { Database, MemberKey, TripContact, TripMemberView, TripSummary } from '@/lib/database.types'
 
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Trip = Database['public']['Tables']['trips']['Row']
@@ -191,4 +191,32 @@ export async function listTrips(): Promise<TripSummary[]> {
       memberCount: memberCounts.get(m.trip_id) ?? 1,
       legCount: legCounts.get(m.trip_id) ?? 0,
     }))
+}
+
+/**
+ * The trip's contact list — whoever is worth being able to ring from a pass with
+ * one bar of signal.
+ *
+ * Ordered by `sort_order` then creation, so the organiser's arrangement holds
+ * and two contacts added at the same position still come back stably.
+ */
+export async function getTripContacts(tripId: string): Promise<TripContact[]> {
+  const supabase = await createClient()
+
+  const { data } = await supabase
+    .from('trip_contacts')
+    .select('id, role, name, phone, note, sort_order')
+    .eq('trip_id', tripId)
+    .order('sort_order')
+    .order('created_at')
+
+  type Row = Database['public']['Tables']['trip_contacts']['Row']
+  return ((data ?? []) as Row[]).map(c => ({
+    id: c.id,
+    role: c.role,
+    name: c.name,
+    phone: c.phone,
+    note: c.note,
+    sortOrder: c.sort_order,
+  }))
 }

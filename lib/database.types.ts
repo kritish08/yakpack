@@ -43,6 +43,23 @@ export interface TripSummary {
   legCount: number
 }
 
+/**
+ * One useful number for a trip: the operator, a driver, a homestay, insurance.
+ *
+ * `role` is free text rather than an enum. The first trip this app was built for
+ * had a coordinator and an on-ground leader, which is one tour operator's org
+ * chart — a self-drive trip has neither, and a trek has a guide and a permit
+ * office. Fixed slots would force every other trip to leave them blank or lie.
+ */
+export interface TripContact {
+  id: string
+  role: string
+  name: string | null
+  phone: string | null
+  note: string | null
+  sortOrder: number
+}
+
 /** One person in the trip, as the UI needs them. */
 export interface TripMemberView {
   memberKey: MemberKey
@@ -102,10 +119,6 @@ export type Database = {
           id: string
           name: string
           depart_date: string | null
-          coordinator_name: string | null
-          coordinator_phone: string | null
-          leader_name: string | null
-          leader_phone: string | null
           is_template: boolean
           created_by: string | null
           created_at: string
@@ -114,10 +127,6 @@ export type Database = {
           id?: string
           name: string
           depart_date?: string | null
-          coordinator_name?: string | null
-          coordinator_phone?: string | null
-          leader_name?: string | null
-          leader_phone?: string | null
           is_template?: boolean
           created_by?: string | null
           created_at?: string
@@ -126,12 +135,40 @@ export type Database = {
           id?: string
           name?: string
           depart_date?: string | null
-          coordinator_name?: string | null
-          coordinator_phone?: string | null
-          leader_name?: string | null
-          leader_phone?: string | null
           is_template?: boolean
           created_by?: string | null
+          created_at?: string
+        }
+      }
+      trip_contacts: {
+        Row: {
+          id: string
+          trip_id: string
+          role: string
+          name: string | null
+          phone: string | null
+          note: string | null
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          role: string
+          name?: string | null
+          phone?: string | null
+          note?: string | null
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          trip_id?: string
+          role?: string
+          name?: string | null
+          phone?: string | null
+          note?: string | null
+          sort_order?: number
           created_at?: string
         }
       }
