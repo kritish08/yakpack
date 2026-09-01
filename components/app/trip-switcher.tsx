@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ChevronDown, Loader2, Plus, Users } from 'lucide-react'
-import { createTrip, switchTrip } from '@/app/actions/trips'
+import Link from 'next/link'
+import { Check, ChevronDown, Plus, Users } from 'lucide-react'
+import { switchTrip } from '@/app/actions/trips'
 import type { TripSummary } from '@/lib/database.types'
 
 /**
@@ -17,8 +18,6 @@ import type { TripSummary } from '@/lib/database.types'
 export default function TripSwitcher({ trips, currentName }: { trips: TripSummary[]; currentName: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const ref = useRef<HTMLDivElement>(null)
@@ -28,9 +27,9 @@ export default function TripSwitcher({ trips, currentName }: { trips: TripSummar
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setCreating(false) }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); setCreating(false) } }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -48,19 +47,6 @@ export default function TripSwitcher({ trips, currentName }: { trips: TripSummar
         router.refresh()
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not switch trip.')
-      }
-    })
-  }
-
-  function make() {
-    setError(null)
-    startTransition(async () => {
-      try {
-        await createTrip(name)
-        setName(''); setCreating(false); setOpen(false)
-        router.refresh()
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not create the trip.')
       }
     })
   }
@@ -111,33 +97,17 @@ export default function TripSwitcher({ trips, currentName }: { trips: TripSummar
           </div>
 
           <div className="border-t border-border p-2">
-            {creating ? (
-              <div className="flex gap-1.5">
-                <input
-                  value={name}
-                  autoFocus
-                  onChange={e => setName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && name.trim()) make() }}
-                  placeholder="Trip name"
-                  aria-label="New trip name"
-                  className="w-full bg-surface-2 border border-border rounded-lg px-2.5 py-2 text-sm text-text outline-none focus:border-accent transition-colors"
-                />
-                <button
-                  disabled={pending || !name.trim()}
-                  onClick={make}
-                  className="shrink-0 px-2.5 rounded-lg bg-accent text-bg font-display font-bold text-xs uppercase disabled:opacity-40 min-h-[40px]"
-                >
-                  {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setCreating(true)}
-                className="w-full flex items-center gap-2 px-1.5 py-2 font-mono text-xs text-text-muted hover:text-accent transition-colors min-h-[40px]"
-              >
-                <Plus size={13} /> New trip
-              </button>
-            )}
+            {/* Creating a trip is a flow, not a text box: it starts from a PDF, a
+                link or a few typed days, and it builds a packing list off the
+                route. A name-only shortcut here would skip all of that and
+                produce an empty trip. */}
+            <Link
+              href="/app/trips/new"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center gap-2 px-1.5 py-2 font-mono text-xs text-text-muted hover:text-accent transition-colors min-h-[40px]"
+            >
+              <Plus size={13} aria-hidden="true" /> New trip
+            </Link>
             {error && <p className="font-mono text-[11px] text-accent-3 px-1.5 pt-1.5">{error}</p>}
           </div>
         </div>

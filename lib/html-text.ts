@@ -1,3 +1,5 @@
+import { normaliseExtracted } from '@/lib/text-normalise'
+
 /**
  * HTML → the readable text of a page.
  *
@@ -9,9 +11,16 @@
  */
 
 const ENTITIES: Record<string, string> = {
-  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
-  ndash: '–', mdash: '—', hellip: '…', rsquo: '’', lsquo: '‘',
-  ldquo: '“', rdquo: '”', deg: '°', middot: '·', bull: '•', times: '×',
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ensp: ' ', emsp: ' ', thinsp: ' ',
+  ndash: '–', mdash: '—', minus: '−', hellip: '…', bull: '•', middot: '·', sdot: '·',
+  rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', sbquo: '‚', bdquo: '„', prime: '′', Prime: '″',
+  deg: '°', times: '×', divide: '÷', plusmn: '±', frac12: '½', frac14: '¼', frac34: '¾',
+  // Arrows carry the route in an itinerary — "Leh &rarr; Nubra" is the whole line.
+  rarr: '→', larr: '←', uarr: '↑', darr: '↓', harr: '↔', rArr: '⇒', lArr: '⇐',
+  copy: '©', reg: '®', trade: '™', euro: '€', pound: '£', yen: '¥', cent: '¢',
+  eacute: 'é', egrave: 'è', agrave: 'à', ccedil: 'ç', uuml: 'ü', ouml: 'ö', auml: 'ä', ntilde: 'ñ',
+  aacute: 'á', iacute: 'í', oacute: 'ó', uacute: 'ú', szlig: 'ß', aring: 'å', oslash: 'ø',
+  shy: '', zwnj: '', zwj: '', lrm: '', rlm: '',
 }
 
 function decodeEntities(s: string): string {
@@ -40,6 +49,9 @@ export function htmlToText(html: string): string {
   let s = html
 
   // Whole subtrees that are never content.
+  // <head> first: otherwise the <title> is emitted as the opening line of the
+  // body, and the model reads the site's name as the trip's first day.
+  s = s.replace(/<head\b[\s\S]*?<\/head>/i, ' ')
   s = s.replace(/<(script|style|noscript|template|svg|iframe|form|select)\b[\s\S]*?<\/\1>/gi, ' ')
   s = s.replace(/<(nav|header|footer|aside)\b[\s\S]*?<\/\1>/gi, ' ')
   s = s.replace(/<!--[\s\S]*?-->/g, ' ')
@@ -55,13 +67,5 @@ export function htmlToText(html: string): string {
   s = s.replace(/<[^>]+>/g, ' ')
   s = decodeEntities(s)
 
-  return s
-    .replace(/[ \t\f\v ]+/g, ' ')
-    .replace(/ ?\n ?/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .split('\n')
-    .map(l => l.trim())
-    .filter((l, i, arr) => l !== '' || arr[i - 1] !== '')  // no double blanks
-    .join('\n')
-    .trim()
+  return normaliseExtracted(s)
 }
