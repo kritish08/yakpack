@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { getTodayData, fetchWeather } from '@/lib/today'
 import { deriveCarryTags } from '@/lib/weather'
 import WeatherHero from '@/components/today/weather-hero'
@@ -11,11 +12,13 @@ import { AI_ENABLED } from '@/lib/ai'
 export default async function TodayPage() {
   const { todayLeg, items, packedIds, isToday, isFuture, isPast } = await getTodayData()
 
-  // A day with no accepted location has no coordinates, and therefore no
-  // weather. That is a normal state, not a missing value to paper over.
-  const wx = todayLeg && todayLeg.lat != null && todayLeg.lon != null
-    ? await fetchWeather(todayLeg.lat, todayLeg.lon)
-    : null
+  // Three different things can leave this screen without a forecast, and they
+  // need three different sentences. A day with no coordinates is a normal state
+  // with an obvious next step; a failed fetch is a connection problem; no day at
+  // all is neither. Collapsing them into "check your connection" tells someone
+  // standing in a valley with full signal to go and fix their signal.
+  const hasLocation = todayLeg?.lat != null && todayLeg?.lon != null
+  const wx = hasLocation ? await fetchWeather(todayLeg!.lat!, todayLeg!.lon!) : null
   const activeTags = wx && todayLeg ? deriveCarryTags(wx, todayLeg.altitude_m ?? 0) : []
 
   const mood = deriveMood({
@@ -49,9 +52,38 @@ export default async function TodayPage() {
       {/* Weather */}
       {wx ? (
         <WeatherHero wx={wx} altitude_m={todayLeg?.altitude_m ?? 0} activeTags={activeTags} leg={todayLeg ?? null} />
-      ) : (
+      ) : todayLeg && !hasLocation ? (
+        <div className="bg-surface border border-border rounded-2xl p-5">
+          <p className="font-mono text-sm text-text-muted">No location on this day yet</p>
+          <p className="font-body text-xs text-text-dim mt-1 leading-relaxed">
+            Add a place to{' '}
+            <Link href="/app/plan" className="text-accent underline underline-offset-2">
+              {todayLeg.leg}
+            </Link>{' '}
+            and the forecast, the UV warning and the cold-weather items follow from it.
+          </p>
+        </div>
+      ) : todayLeg ? (
         <div className="bg-surface border border-border rounded-2xl p-5 font-mono text-sm text-text-muted">
           Weather unavailable — check your connection
+        </div>
+      ) : (
+        // No days at all. Reachable on purpose: the trip builder lets you skip
+        // the itinerary and fill it in later, so this is a new trip rather than
+        // a broken one. Say that, and say what to do next — an almost-empty
+        // Today screen with no explanation reads as the app having failed.
+        <div className="bg-surface border border-border rounded-2xl p-5">
+          <p className="font-mono text-sm text-text-muted">No days in this trip yet</p>
+          <p className="font-body text-xs text-text-dim mt-1 leading-relaxed">
+            Add them on the{' '}
+            <Link href="/app/plan" className="text-accent underline underline-offset-2">Plan</Link>{' '}
+            screen — paste an itinerary or write the days yourself. Weather, altitude
+            warnings and the day-by-day carry list all follow from them.
+          </p>
+          <p className="font-body text-xs text-text-dim mt-2 leading-relaxed">
+            Your packing list works without any of that — it is on{' '}
+            <Link href="/app/pack" className="text-accent underline underline-offset-2">Pack</Link>.
+          </p>
         </div>
       )}
 
