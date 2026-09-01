@@ -36,8 +36,8 @@ export interface TripContext {
  * proxy, and a signed-in user with no trip means registration did not finish —
  * the app layout catches that and sends them back through onboarding.
  */
-export async function getTripContext(): Promise<TripContext> {
-  const supabase = await createClient()
+export async function getTripContext(fresh = false): Promise<TripContext> {
+  const supabase = await createClient({ fresh })
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -141,7 +141,9 @@ export async function ensureTripContext(): Promise<TripContext> {
   const { error } = await (supabase as any).rpc('create_trip_from_template', { p_trip_name: null })
   if (error) throw new Error(error.message)
 
-  return getTripContext()
+  // Read fresh: the memoized query still holds the empty result that sent us
+  // here, and reusing it would report NO_TRIP for a trip we just created.
+  return getTripContext(true)
 }
 
 /**

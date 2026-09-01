@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { getTripContext, type TripContext } from '@/lib/trip'
+import { ensureTripContext, type TripContext } from '@/lib/trip'
 import type { Database } from '@/lib/database.types'
 
 export type Category = Database['public']['Tables']['categories']['Row']
@@ -9,7 +9,13 @@ export type Packed = Database['public']['Tables']['packed']['Row']
 export type CategoryWithItems = Category & { items: Item[] }
 
 export async function getPackData() {
-  const ctx = await getTripContext()
+  // ensureTripContext, not getTripContext: a layout and its page render
+  // concurrently in the App Router, so the layout's bootstrap has not
+  // necessarily finished when this runs. A user whose signup and first session
+  // were separated by email confirmation would otherwise get a 500 on their very
+  // first visit, and only a reload would fix it. The RPC is idempotent, so
+  // whichever of the two gets there first wins.
+  const ctx = await ensureTripContext()
   const supabase = await createClient()
 
   const [categoriesRes, itemsRes, packedRes] = await Promise.all([

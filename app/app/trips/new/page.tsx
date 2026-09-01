@@ -9,5 +9,5 @@ export default async function NewTripPage() {
   // failing the page over.
   const trips = await listTrips().catch(() => [])
 
-  return <NewTripFlow aiEnabled={AI_ENABLED} isFirstTrip={trips.length <= 1} />
+  return <NewTripFlow aiEnabled={AI_ENABLED} isFirstTrip={trips.length === 0} />
 }
