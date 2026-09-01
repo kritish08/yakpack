@@ -11,7 +11,11 @@ import { AI_ENABLED } from '@/lib/ai'
 export default async function TodayPage() {
   const { todayLeg, items, packedIds, isToday, isFuture, isPast } = await getTodayData()
 
-  const wx = todayLeg ? await fetchWeather(todayLeg.lat, todayLeg.lon) : null
+  // A day with no accepted location has no coordinates, and therefore no
+  // weather. That is a normal state, not a missing value to paper over.
+  const wx = todayLeg && todayLeg.lat != null && todayLeg.lon != null
+    ? await fetchWeather(todayLeg.lat, todayLeg.lon)
+    : null
   const activeTags = wx && todayLeg ? deriveCarryTags(wx, todayLeg.altitude_m ?? 0) : []
 
   const mood = deriveMood({

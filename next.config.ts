@@ -76,6 +76,16 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  // Next 16 blocks dev-only resources (/_next/webpack-hmr, dev chunks) when the
+  // browser's host is not the one the dev server considers its own. Visiting
+  // http://127.0.0.1:3000 instead of http://localhost:3000 therefore serves the
+  // HTML but blocks the client bundle, so hydration silently never completes:
+  // the page renders, and nothing on it works. It is a confusing failure because
+  // there is no console error, only a warning in the terminal.
+  //
+  // Both spellings of the loopback host are the same machine, so allow both.
+  allowedDevOrigins: ['localhost', '127.0.0.1'],
+
   // enable standalone output for Docker self-host
   output: process.env.BUILD_STANDALONE === 'true' ? 'standalone' : undefined,
 

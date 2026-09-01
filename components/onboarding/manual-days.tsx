@@ -44,7 +44,15 @@ export default function ManualDays({
     setDays(d => d.map((row, n) => (n === i ? { ...row, ...patch } : row)))
   }
 
-  /** Adds a day, dating it the day after the last one that has a date. */
+  /**
+   * Adds a day, dating it the day after the last one that has a date.
+   *
+   * Formatted from the local date parts rather than through toISOString().
+   * `new Date('2027-05-14T00:00:00')` is local midnight, and toISOString()
+   * converts that to UTC — east of Greenwich it lands on the previous day, so
+   * every added day came out with the date of the one before it. Only visible
+   * in a non-UTC timezone, which is why it survived the unit tests.
+   */
   function addDay() {
     setDays(d => {
       const lastDated = [...d].reverse().find(x => x.date)?.date
@@ -52,7 +60,7 @@ export default function ManualDays({
       if (lastDated) {
         const t = new Date(lastDated + 'T00:00:00')
         t.setDate(t.getDate() + 1)
-        next = t.toISOString().slice(0, 10)
+        next = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
       }
       return [...d, { date: next, leg: '', place: '', altitude: '' }]
     })

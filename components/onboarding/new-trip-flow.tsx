@@ -124,15 +124,22 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
 
   /* ── Packing ────────────────────────────────────────────────────────────── */
 
-  /** Applies the accepted geocoder suggestions, giving the days their real numbers. */
+  /**
+   * Applies the accepted geocoder suggestions, giving the days their real numbers.
+   *
+   * Falls back to what the day already holds rather than to null. On the manual
+   * path there is never a suggestion — the traveller typed the altitude
+   * themselves — and overwriting that with null threw away the one number the
+   * AMS warnings and the cold-weather packing rules actually run on.
+   */
   function resolvedDays() {
     return days.map(d => {
       const use = accepted[d.day] && d.suggestion
       return {
         ...d,
-        lat: use ? d.suggestion!.lat : null,
-        lon: use ? d.suggestion!.lon : null,
-        altitude_m: use ? d.suggestion!.elevation : null,
+        lat: use ? d.suggestion!.lat : d.lat,
+        lon: use ? d.suggestion!.lon : d.lon,
+        altitude_m: use ? d.suggestion!.elevation : d.altitude_m,
       }
     })
   }

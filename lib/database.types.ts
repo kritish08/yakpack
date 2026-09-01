@@ -327,8 +327,8 @@ export type Database = {
           day: number
           date: string | null
           leg: string
-          lat: number
-          lon: number
+          lat: number | null
+          lon: number | null
           altitude_m: number | null
           highlights: string | null
           carry_today: string[]
@@ -343,8 +343,8 @@ export type Database = {
           day: number
           date?: string | null
           leg: string
-          lat: number
-          lon: number
+          lat: number | null
+          lon: number | null
           altitude_m?: number | null
           highlights?: string | null
           carry_today?: string[]
@@ -359,8 +359,8 @@ export type Database = {
           day?: number
           date?: string | null
           leg?: string
-          lat?: number
-          lon?: number
+          lat?: number | null
+          lon?: number | null
           altitude_m?: number | null
           highlights?: string | null
           carry_today?: string[]

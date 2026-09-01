@@ -11,7 +11,7 @@
 //   - Weather: network-first with stale fallback.
 //   - Other /api/* (AI etc.): network-only.
 
-const CACHE_VERSION = 'yakpack-v4'
+const CACHE_VERSION = 'yakpack-v5'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 const PAGE_CACHE = `${CACHE_VERSION}-pages`
 const DATA_CACHE = `${CACHE_VERSION}-data`
@@ -24,7 +24,36 @@ const PRECACHE = ['/offline']
 
 const KEEP = new Set([STATIC_CACHE, PAGE_CACHE, DATA_CACHE, WEATHER_CACHE])
 
+// ── Never run in development ────────────────────────────────────────────────
+//
+// In production /_next/static/* is content-hashed, so cache-first is safe and
+// correct. Under `next dev` those same paths are REUSED across rebuilds: the
+// chunk at /_next/static/chunks/app_page.js is different code after every edit,
+// at the same URL. Cache-first therefore pins the first build forever while
+// navigations keep fetching fresh HTML from the network.
+//
+// Fresh HTML plus stale chunks means hydration throws and React never mounts —
+// a black screen, on an app whose background is #0f0e0c. It gets worse with
+// every edit, and no amount of reloading fixes it, because the stale copy is
+// exactly what is being served.
+//
+// A registered worker outlives the mistake, so this cannot be fixed only by
+// declining to register: the fix has to come from the worker itself. The browser
+// re-checks /sw.js on navigation, so a byte-different file installs, activates,
+// wipes every cache and unregisters — after which the page loads normally again.
+const DEV_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '0.0.0.0'])
+const IS_DEV = DEV_HOSTS.has(self.location.hostname) || self.location.hostname.endsWith('.local')
+
+async function selfDestruct() {
+  const keys = await caches.keys()
+  await Promise.all(keys.map((k) => caches.delete(k)))
+  await self.registration.unregister()
+  const clients = await self.clients.matchAll({ type: 'window' })
+  for (const client of clients) client.navigate(client.url)
+}
+
 self.addEventListener('install', (event) => {
+  if (IS_DEV) { self.skipWaiting(); return }
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => cache.addAll(PRECACHE))
@@ -33,6 +62,7 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
+  if (IS_DEV) { event.waitUntil(selfDestruct()); return }
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => !KEEP.has(k)).map((k) => caches.delete(k))))
@@ -73,6 +103,7 @@ self.addEventListener('fetch', (event) => {
   if (!url.protocol.startsWith('http')) return
 
   // ── RSC navigation payloads: network-only, always ───────────────────────────
+  if (IS_DEV) return
   if (isRscRequest(request, url)) return
 
   // ── Supabase ────────────────────────────────────────────────────────────────
