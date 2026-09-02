@@ -1,8 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ClipboardPaste, Loader2, MapPin, Plus, Trash2, Wand2 } from 'lucide-react'
+import { parseItineraryText } from '@/lib/parse-itinerary'
 import type { DraftContact, DraftDay } from '@/lib/import-types'
+
+interface Elevation { place: string; name: string; country: string | null; elevation: number | null; matches: boolean }
 
 const btn = 'font-display font-bold uppercase tracking-tight text-sm py-3 rounded-xl min-h-[44px] flex items-center justify-center gap-2 disabled:opacity-40'
 const field = 'w-full bg-surface-2 border border-border rounded-xl px-3 py-2.5 text-sm text-text outline-none focus:border-accent transition-colors'
@@ -37,8 +40,108 @@ export default function ManualDays({
   const [step, setStep] = useState<Step>('name')
   const [days, setDays] = useState<DraftDay[]>([{ date: '', leg: '', place: '', altitude: '' }])
   const [startDate, setStartDate] = useState('')
+  const [dayCount, setDayCount] = useState('')
+  const [paste, setPaste] = useState('')
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [elevations, setElevations] = useState<Record<number, Elevation>>({})
+  const [lookingUp, setLookingUp] = useState(false)
+  const [lookupNote, setLookupNote] = useState<string | null>(null)
 
   const index = STEPS.indexOf(step)
+
+  /** Local-calendar date arithmetic; toISOString() would shift the day west. */
+  function addDays(isoDate: string, n: number): string {
+    const t = new Date(isoDate + 'T00:00:00')
+    t.setDate(t.getDate() + n)
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+  }
+
+  /**
+   * Lays out N blank, consecutively dated days.
+   *
+   * Typing "9" and getting nine dated rows to fill in beats pressing "Add a day"
+   * nine times, which was the single most tedious thing about this screen.
+   */
+  function prefill(n: number, from: string) {
+    const count = Math.max(1, Math.min(60, n))
+    setDays(Array.from({ length: count }, (_, i) => ({
+      date: from ? addDays(from, i) : '',
+      leg: '', place: '', altitude: '',
+    })))
+    setElevations({})
+  }
+
+  /**
+   * Turns pasted text into rows, with no AI and no key.
+   *
+   * Most itineraries already arrive shaped as "Day 1 — Delhi to Shimla", so
+   * rules get there without a round trip or an API key — and BYOK means no key
+   * is the default state of a new account.
+   */
+  function applyPaste() {
+    const year = startDate ? Number(startDate.slice(0, 4)) : undefined
+    const parsed = parseItineraryText(paste, year)
+    if (parsed.length === 0) { setLookupNote('Nothing that looked like days — try one line per day.'); return }
+
+    setDays(parsed.map((d, i) => ({
+      // A source with no dates still gets them, counted from the trip's start.
+      date: d.date ?? (startDate ? addDays(startDate, i) : ''),
+      leg: d.leg,
+      place: d.place ?? '',
+      altitude: d.altitude != null ? String(d.altitude) : '',
+    })))
+    setElevations({})
+    setPasteOpen(false)
+    setPaste('')
+    setLookupNote(`Read ${parsed.length} day${parsed.length === 1 ? '' : 's'}. Check them below.`)
+  }
+
+  /**
+   * Proposes an elevation per day from its place name. Never applies one.
+   *
+   * Open-Meteo resolves "Kaza" to Kazan' in Russia at 61 m against a true
+   * 3,800 m, and altitude is what the AMS warnings run on — so each suggestion
+   * is shown with the name and country it actually resolved to, and has to be
+   * accepted. A doubtful match is offered, not taken.
+   */
+  async function lookupAltitudes() {
+    const targets = days.map(d => (d.place || d.leg).trim())
+    if (targets.every(t => !t)) { setLookupNote('Add a place or a route first.'); return }
+    setLookingUp(true); setLookupNote(null)
+    try {
+      const res = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ places: targets }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setLookupNote(json?.error ?? 'Could not look those up.'); return }
+
+      const next: Record<number, Elevation> = {}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(json.suggestions as any[]).forEach((sg, i) => {
+        if (sg && sg.elevation != null) {
+          next[i] = { place: targets[i], name: sg.name, country: sg.country, elevation: sg.elevation, matches: !!sg.nameMatches }
+        }
+      })
+      setElevations(next)
+      const n = Object.keys(next).length
+      setLookupNote(n === 0
+        ? 'No elevations found for those places — type them instead.'
+        : `Found ${n} of ${days.length}. Accept the ones that look right.`)
+    } catch {
+      setLookupNote('Could not reach the lookup.')
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
+  function acceptElevation(i: number) {
+    const e = elevations[i]
+    if (!e) return
+    setDay(i, { altitude: String(e.elevation) })
+    setElevations(prev => { const n = { ...prev }; delete n[i]; return n })
+  }
 
   function setDay(i: number, patch: Partial<DraftDay>) {
     setDays(d => d.map((row, n) => (n === i ? { ...row, ...patch } : row)))
@@ -56,13 +159,7 @@ export default function ManualDays({
   function addDay() {
     setDays(d => {
       const lastDated = [...d].reverse().find(x => x.date)?.date
-      let next = ''
-      if (lastDated) {
-        const t = new Date(lastDated + 'T00:00:00')
-        t.setDate(t.getDate() + 1)
-        next = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
-      }
-      return [...d, { date: next, leg: '', place: '', altitude: '' }]
+      return [...d, { date: lastDated ? addDays(lastDated, 1) : '', leg: '', place: '', altitude: '' }]
     })
   }
 
@@ -108,16 +205,30 @@ export default function ManualDays({
             id="yak-start"
             type="date"
             value={startDate}
-            onChange={e => {
-              setStartDate(e.target.value)
-              // Seed day one, so the days step is not staring at an empty date.
-              setDays(d => (d.length > 0 && !d[0].date ? [{ ...d[0], date: e.target.value }, ...d.slice(1)] : d))
-            }}
+            onChange={e => setStartDate(e.target.value)}
             className={field}
           />
 
+          <label className={`${label} mt-3`} htmlFor="yak-daycount">How many days? (optional)</label>
+          <input
+            id="yak-daycount"
+            type="number" inputMode="numeric" min={1} max={60}
+            value={dayCount}
+            onChange={e => setDayCount(e.target.value)}
+            placeholder="9"
+            className={field}
+          />
+          <p className="font-mono text-[10px] text-text-dim mt-1 leading-relaxed">
+            Lays out that many dated rows to fill in. You can still add or remove days after.
+          </p>
+
           <button
-            onClick={() => setStep('days')}
+            onClick={() => {
+              const n = parseInt(dayCount, 10)
+              if (Number.isFinite(n) && n > 0) prefill(n, startDate)
+              else if (startDate) setDays(d => (d.length > 0 && !d[0].date ? [{ ...d[0], date: startDate }, ...d.slice(1)] : d))
+              setStep('days')
+            }}
             disabled={tripName.trim().length === 0}
             className={`${btn} w-full bg-accent text-bg mt-5`}
           >
@@ -129,10 +240,55 @@ export default function ManualDays({
       {step === 'days' && (
         <>
           <h2 className="font-display font-bold text-sm uppercase tracking-tight text-text mb-1">The days</h2>
-          <p className="font-body text-xs text-text-muted leading-relaxed mb-4">
-            As many as you know. Altitude is worth filling in where you know it — it is
-            what drives the altitude warnings and the cold-weather packing.
+          <p className="font-body text-xs text-text-muted leading-relaxed mb-3">
+            Paste an itinerary and it will be read for you, or fill the rows in yourself.
+            Altitude matters most — it drives the altitude warnings and the cold-weather packing.
           </p>
+
+          <div className="flex flex-wrap gap-2 mb-3">
+            <button
+              onClick={() => setPasteOpen(o => !o)}
+              className="flex items-center gap-1.5 px-3 rounded-lg border border-border text-text-muted hover:text-text hover:border-accent/40 transition-colors font-mono text-[11px] min-h-[40px]"
+            >
+              <ClipboardPaste size={13} aria-hidden="true" /> Paste an itinerary
+            </button>
+            <button
+              onClick={lookupAltitudes}
+              disabled={lookingUp}
+              className="flex items-center gap-1.5 px-3 rounded-lg border border-border text-text-muted hover:text-text hover:border-accent/40 transition-colors font-mono text-[11px] min-h-[40px] disabled:opacity-40"
+            >
+              {lookingUp
+                ? <><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Looking up…</>
+                : <><Wand2 size={13} aria-hidden="true" /> Look up altitudes</>}
+            </button>
+          </div>
+
+          {pasteOpen && (
+            <div className="mb-4">
+              <textarea
+                value={paste}
+                onChange={e => setPaste(e.target.value)}
+                rows={7}
+                aria-label="Paste your itinerary"
+                placeholder={'Day 1 — Delhi to Shimla, overnight bus\nDay 2 — Shimla to Chitkul (3,450 m)\nDay 3 — Chitkul to Tabo via Nako, 3280 m'}
+                className="w-full bg-surface-2 border border-border rounded-xl px-3 py-2.5 text-sm text-text font-body outline-none focus:border-accent transition-colors resize-y"
+              />
+              <div className="flex gap-2 mt-2">
+                <button onClick={applyPaste} disabled={paste.trim().length < 8} className={`${btn} flex-1 bg-accent text-bg`}>
+                  Read it
+                </button>
+                <button onClick={() => { setPasteOpen(false); setPaste('') }} className="px-4 rounded-xl border border-border text-text-muted font-mono text-xs min-h-[44px]">
+                  Cancel
+                </button>
+              </div>
+              <p className="font-mono text-[10px] text-text-dim mt-2 leading-relaxed">
+                Read here on your device — no AI key needed. Dates and altitudes are picked
+                up when they are written down, and left blank when they are not.
+              </p>
+            </div>
+          )}
+
+          {lookupNote && <p className="font-mono text-[11px] text-accent mb-3 leading-relaxed">{lookupNote}</p>}
 
           <ol className="flex flex-col gap-3">
             {days.map((d, i) => (
@@ -167,6 +323,25 @@ export default function ManualDays({
                     min={-500} max={9000} className={field}
                   />
                 </div>
+
+                {elevations[i] && (
+                  <button
+                    onClick={() => acceptElevation(i)}
+                    className="mt-2 w-full text-left flex items-start gap-2 rounded-lg border border-border/60 hover:border-accent/50 transition-colors px-2.5 py-2"
+                  >
+                    <MapPin size={11} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                    <span className="font-mono text-[11px] leading-relaxed">
+                      <span className={elevations[i].matches ? 'text-text-muted' : 'text-accent-3'}>
+                        {elevations[i].place} → {elevations[i].name}
+                        {elevations[i].country ? `, ${elevations[i].country}` : ''}
+                      </span>
+                      <span className="block text-text-dim">
+                        {elevations[i].elevation?.toLocaleString()} m · tap to use
+                        {elevations[i].matches ? '' : ' — name did not match, check it'}
+                      </span>
+                    </span>
+                  </button>
+                )}
               </li>
             ))}
           </ol>
