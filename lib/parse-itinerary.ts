@@ -199,7 +199,7 @@ export function parseItineraryText(text: string, defaultYear?: number): ParsedLi
       .replace(/\s*[.,;:·]\s*(?=[.,;:·])/g, '')
       .replace(/\s{2,}/g, ' ')
       .replace(/^[\s\-–—:•*·.,]+/, '')
-      .replace(/[\s\-–—:·]+$/, '')
+      .replace(/[\s\-–—:·,;]+$/, '')
       .replace(/\s+\.$/, '')
       .trim()
     return {

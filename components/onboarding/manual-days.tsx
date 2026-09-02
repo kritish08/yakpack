@@ -5,7 +5,15 @@ import { ArrowLeft, ClipboardPaste, Loader2, MapPin, Plus, Trash2, Wand2 } from 
 import { parseItineraryText } from '@/lib/parse-itinerary'
 import type { DraftContact, DraftDay } from '@/lib/import-types'
 
-interface Elevation { place: string; name: string; country: string | null; elevation: number | null; matches: boolean }
+interface Elevation {
+  place: string
+  name: string
+  country: string | null
+  elevation: number | null
+  matches: boolean
+  /** Resolved to a different country from the rest of the route. */
+  offRoute: boolean
+}
 
 const btn = 'font-display font-bold uppercase tracking-tight text-sm py-3 rounded-xl min-h-[44px] flex items-center justify-center gap-2 disabled:opacity-40'
 const field = 'w-full bg-surface-2 border border-border rounded-xl px-3 py-2.5 text-sm text-text outline-none focus:border-accent transition-colors'
@@ -105,8 +113,17 @@ export default function ManualDays({
    * accepted. A doubtful match is offered, not taken.
    */
   async function lookupAltitudes() {
-    const targets = days.map(d => (d.place || d.leg).trim())
-    if (targets.every(t => !t)) { setLookupNote('Add a place or a route first.'); return }
+    // Only rows with no altitude yet. The lookup exists to fill gaps, not to
+    // second-guess a number the source actually stated: the itinerary said
+    // Chitkul is 3,450 m and the geocoder says 529 m, and the itinerary is
+    // right. Offering to overwrite it is offering to make the trip wrong.
+    const targets = days.map(d => (d.altitude.trim() ? '' : (d.place || d.leg).trim()))
+    if (targets.every(t => !t)) {
+      setLookupNote(days.every(d => d.altitude.trim())
+        ? 'Every day already has an altitude.'
+        : 'Add a place or a route first.')
+      return
+    }
     setLookingUp(true); setLookupNote(null)
     try {
       const res = await fetch('/api/geocode', {
@@ -117,18 +134,40 @@ export default function ManualDays({
       const json = await res.json()
       if (!res.ok) { setLookupNote(json?.error ?? 'Could not look those up.'); return }
 
-      const next: Record<number, Elevation> = {}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(json.suggestions as any[]).forEach((sg, i) => {
+      const raw = (json.suggestions as any[])
+
+      // A matching name is a weaker signal than it looks: "Tabo" resolves to
+      // Tabo in Ivory Coast and "Manali" to a Manali at 6 m, both with the name
+      // matching exactly. A trip almost never crosses continents day to day, so
+      // the country the rest of the route agrees on is a far better check —
+      // whichever country most days landed in becomes the expectation, and the
+      // outliers are called out.
+      const tally = new Map<string, number>()
+      for (const sg of raw) {
+        if (sg?.country) tally.set(sg.country, (tally.get(sg.country) ?? 0) + 1)
+      }
+      const mainCountry = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+
+      const next: Record<number, Elevation> = {}
+      raw.forEach((sg, i) => {
         if (sg && sg.elevation != null) {
-          next[i] = { place: targets[i], name: sg.name, country: sg.country, elevation: sg.elevation, matches: !!sg.nameMatches }
+          next[i] = {
+            place: targets[i],
+            name: sg.name,
+            country: sg.country,
+            elevation: sg.elevation,
+            matches: !!sg.nameMatches,
+            offRoute: Boolean(mainCountry && sg.country && sg.country !== mainCountry),
+          }
         }
       })
       setElevations(next)
+      const asked = targets.filter(Boolean).length
       const n = Object.keys(next).length
       setLookupNote(n === 0
         ? 'No elevations found for those places — type them instead.'
-        : `Found ${n} of ${days.length}. Accept the ones that look right.`)
+        : `Found ${n} of the ${asked} day${asked === 1 ? '' : 's'} still missing one. Tap the ones that look right.`)
     } catch {
       setLookupNote('Could not reach the lookup.')
     } finally {
@@ -331,13 +370,15 @@ export default function ManualDays({
                   >
                     <MapPin size={11} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
                     <span className="font-mono text-[11px] leading-relaxed">
-                      <span className={elevations[i].matches ? 'text-text-muted' : 'text-accent-3'}>
+                      <span className={elevations[i].matches && !elevations[i].offRoute ? 'text-text-muted' : 'text-accent-3'}>
                         {elevations[i].place} → {elevations[i].name}
                         {elevations[i].country ? `, ${elevations[i].country}` : ''}
                       </span>
                       <span className="block text-text-dim">
                         {elevations[i].elevation?.toLocaleString()} m · tap to use
-                        {elevations[i].matches ? '' : ' — name did not match, check it'}
+                        {elevations[i].offRoute
+                          ? ' — different country from the rest of your route'
+                          : elevations[i].matches ? '' : ' — name did not match, check it'}
                       </span>
                     </span>
                   </button>
