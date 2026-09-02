@@ -4,9 +4,16 @@ import { AI_ENABLED, modelForRequest } from '@/lib/ai'
 import { isAdmin } from '@/lib/admin'
 import { getTripContext } from '@/lib/trip'
 import { sanitizeText } from '@/lib/sanitize'
-import { geocode } from '@/lib/geocode'
+import { geocodeCandidates, resolveRoute } from '@/lib/geocode'
 
 export const maxDuration = 60
+
+/**
+ * Beyond this a suggestion is almost certainly a different place of the same
+ * name. Real days land within ~260 km of the rest of their route; the places
+ * Open-Meteo does not hold come back 800 km and further.
+ */
+const FAR_KM = 400
 
 /**
  * Turns a pasted itinerary into structured days.
@@ -65,17 +72,35 @@ export async function POST(req: Request) {
       prompt: `Convert this itinerary into days.\n\n---\n${clipped}\n---`,
     })
 
-    // Geography is proposed, never applied. The geocoder is unreliable for small
-    // mountain settlements, and a wrong altitude would corrupt the AMS warnings,
-    // so each day carries its suggestion for a human to accept or correct.
+    // Geography is proposed, never applied — and resolved against the whole
+    // route rather than one name at a time. Open-Meteo returns every "Tabo" and
+    // "Manali" on earth ordered by its own popularity notion, which on this
+    // dataset puts the wrong one first more often than not: on a real Spiti
+    // itinerary, resolving names independently got one of five right, while
+    // using the other days to disambiguate got four, and flagged the fifth as
+    // 833 km off-route. The correct candidate was in the list all along.
+    const places = object.days.map(d => d.place?.trim() || null)
+    const candidateLists = await Promise.all(
+      places.map(p => (p ? geocodeCandidates(p) : Promise.resolve([]))),
+    )
+    const picks = resolveRoute(places, candidateLists)
+
     const gaps: string[] = []
-    const days = await Promise.all(object.days.map(async d => {
-      const place = d.place?.trim() || null
-      const suggestion = place ? await geocode(place) : null
+    const days = object.days.map((d, idx) => {
+      const place = places[idx]
+      const pick = picks[idx]
+      // Far from every other day means the geocoder found *a* place, not *the*
+      // place. Offered, never pre-accepted.
+      const offRoute = Boolean(pick && pick.distanceKm > FAR_KM)
+      const suggestion = pick
+        ? { ...pick, nameMatches: pick.nameMatches && !offRoute }
+        : null
 
       if (!place) gaps.push(`Day ${d.day}: no place named — no weather or altitude.`)
       else if (!suggestion) gaps.push(`Day ${d.day}: couldn't find “${place}”.`)
-      else if (!suggestion.nameMatches) {
+      else if (offRoute) {
+        gaps.push(`Day ${d.day}: “${place}” best matched “${suggestion.name}${suggestion.country ? ', ' + suggestion.country : ''}”, ${suggestion.distanceKm.toLocaleString()} km from the rest of the route — probably the wrong place.`)
+      } else if (!suggestion.nameMatches) {
         gaps.push(`Day ${d.day}: “${place}” best matched “${suggestion.name}${suggestion.country ? ', ' + suggestion.country : ''}” — check before accepting.`)
       }
       if (!d.date) gaps.push(`Day ${d.day}: no date, so it won't line up with “today”.`)
@@ -94,7 +119,7 @@ export async function POST(req: Request) {
         altitude_m: null as number | null,
         suggestion,
       }
-    }))
+    })
 
     return Response.json({
       tripName: object.trip_name ? sanitizeText(object.trip_name, 80) : null,

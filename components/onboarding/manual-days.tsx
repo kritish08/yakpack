@@ -11,13 +11,23 @@ interface Elevation {
   country: string | null
   elevation: number | null
   matches: boolean
-  /** Resolved to a different country from the rest of the route. */
-  offRoute: boolean
+  /** Kilometres from the rest of the route — large means probably wrong. */
+  distanceKm: number
 }
 
 const btn = 'font-display font-bold uppercase tracking-tight text-sm py-3 rounded-xl min-h-[44px] flex items-center justify-center gap-2 disabled:opacity-40'
 const field = 'w-full bg-surface-2 border border-border rounded-xl px-3 py-2.5 text-sm text-text outline-none focus:border-accent transition-colors'
 const label = 'font-mono text-[10px] uppercase tracking-wider text-text-muted block mb-1'
+
+/**
+ * Beyond this, a suggestion is almost certainly the wrong place.
+ *
+ * Real days on real routes land within ~260 km of the rest of the trip; the two
+ * places Open-Meteo simply does not hold — Kaza and Nubra — come back 833 km and
+ * 6,938 km away. The gap between those is wide enough that a single number does
+ * the job without being fussy about it.
+ */
+const FAR_KM = 400
 
 type Step = 'name' | 'days' | 'contacts'
 const STEPS: Step[] = ['name', 'days', 'contacts']
@@ -134,23 +144,9 @@ export default function ManualDays({
       const json = await res.json()
       if (!res.ok) { setLookupNote(json?.error ?? 'Could not look those up.'); return }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = (json.suggestions as any[])
-
-      // A matching name is a weaker signal than it looks: "Tabo" resolves to
-      // Tabo in Ivory Coast and "Manali" to a Manali at 6 m, both with the name
-      // matching exactly. A trip almost never crosses continents day to day, so
-      // the country the rest of the route agrees on is a far better check —
-      // whichever country most days landed in becomes the expectation, and the
-      // outliers are called out.
-      const tally = new Map<string, number>()
-      for (const sg of raw) {
-        if (sg?.country) tally.set(sg.country, (tally.get(sg.country) ?? 0) + 1)
-      }
-      const mainCountry = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
-
       const next: Record<number, Elevation> = {}
-      raw.forEach((sg, i) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(json.suggestions as any[]).forEach((sg, i) => {
         if (sg && sg.elevation != null) {
           next[i] = {
             place: targets[i],
@@ -158,7 +154,7 @@ export default function ManualDays({
             country: sg.country,
             elevation: sg.elevation,
             matches: !!sg.nameMatches,
-            offRoute: Boolean(mainCountry && sg.country && sg.country !== mainCountry),
+            distanceKm: typeof sg.distanceKm === 'number' ? sg.distanceKm : 0,
           }
         }
       })
@@ -370,15 +366,15 @@ export default function ManualDays({
                   >
                     <MapPin size={11} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
                     <span className="font-mono text-[11px] leading-relaxed">
-                      <span className={elevations[i].matches && !elevations[i].offRoute ? 'text-text-muted' : 'text-accent-3'}>
+                      <span className={elevations[i].distanceKm > FAR_KM ? 'text-accent-3' : 'text-text-muted'}>
                         {elevations[i].place} → {elevations[i].name}
                         {elevations[i].country ? `, ${elevations[i].country}` : ''}
                       </span>
                       <span className="block text-text-dim">
                         {elevations[i].elevation?.toLocaleString()} m · tap to use
-                        {elevations[i].offRoute
-                          ? ' — different country from the rest of your route'
-                          : elevations[i].matches ? '' : ' — name did not match, check it'}
+                        {elevations[i].distanceKm > FAR_KM
+                          ? ` — ${elevations[i].distanceKm.toLocaleString()} km from the rest of your route, probably wrong`
+                          : elevations[i].matches ? '' : ' — name did not match exactly'}
                       </span>
                     </span>
                   </button>
