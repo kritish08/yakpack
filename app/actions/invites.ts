@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getTripContext } from '@/lib/trip'
+import { PARTNER_KEYS } from '@/lib/database.types'
 import type { MemberKey } from '@/lib/database.types'
 
 export interface PendingInvite {
@@ -52,7 +53,11 @@ export async function getPartnersState(): Promise<PartnersState> {
   return {
     members: ctx.members,
     invites,
-    canInvite: ctx.isOrganiser && partnersPresent + invites.length < 2,
+    // Against the number of partner slots that exist, not a number typed here.
+    // This read 2 while the database allowed 3, so the last slot was unreachable:
+    // the UI said the trip was full while create_trip_invite would happily have
+    // filled it.
+    canInvite: ctx.isOrganiser && partnersPresent + invites.length < PARTNER_KEYS.length,
     isOrganiser: ctx.isOrganiser,
   }
 }

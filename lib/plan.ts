@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { localToday } from '@/lib/local-date'
 import { getTripContacts, requireTripContext } from '@/lib/trip'
 import type { Database } from '@/lib/database.types'
 
@@ -26,7 +27,7 @@ export async function getPlanData() {
   ])
 
   const legs = (legsRes.data ?? []) as Leg[]
-  const today = new Date().toISOString().slice(0, 10)
+  const today = await localToday()
 
   return { legs, contacts, trip: ctx.trip, ctx, today }
 }

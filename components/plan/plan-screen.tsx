@@ -34,6 +34,13 @@ export default function PlanScreen({ legs, contacts, trip, today, weatherMap, to
   const tripStarted = departDate && today >= departDate
   const tripEnded   = legs.length > 0 && today > (legs[legs.length - 1].date ?? '')
 
+  // Formatted in the traveller's own timezone, from the same `today` the status
+  // is decided by — so the badge and the date can never disagree.
+  const lastDayLabel = legs.length > 0
+    ? new Date((legs[legs.length - 1].date ?? '') + 'T12:00:00Z')
+        .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : ''
+
   const daysToGo = departDate && !tripStarted
     ? Math.ceil((new Date(departDate + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
     : null
@@ -87,12 +94,19 @@ export default function PlanScreen({ legs, contacts, trip, today, weatherMap, to
               {trip?.name ?? 'Your trip'}
             </h1>
             <p className="font-mono text-xs text-text-muted mt-1">
-              {legs.length === 0 ? 'No plan yet' : `${legs.length} day${legs.length === 1 ? '' : 's'}`}
+              {legs.length === 0
+                ? 'No plan yet'
+                : tripEnded
+                  ? `${legs.length} days · ended ${lastDayLabel}`
+                  : `${legs.length} day${legs.length === 1 ? '' : 's'}`}
             </p>
           </div>
+          {/* "Complete" read as "you finished packing". The trip is over — a
+              status about dates, not about progress — and it is still fully
+              editable, which the subtitle says rather than the badge. */}
           {tripEnded ? (
             <span className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-border/30 text-text-muted border border-border shrink-0">
-              Complete
+              Trip ended
             </span>
           ) : daysToGo !== null ? (
             <span className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full bg-accent/10 text-accent border border-accent/30 shrink-0">
@@ -104,6 +118,13 @@ export default function PlanScreen({ legs, contacts, trip, today, weatherMap, to
             </span>
           )}
         </div>
+
+        {tripEnded && (
+          <p className="font-body text-xs text-text-dim leading-relaxed mt-2">
+            These dates have passed. Everything stays exactly as it is — you can still
+            edit the days, tick things off and look back over it.
+          </p>
+        )}
 
         {/* Trip contacts — as many as the trip has, each with its own role. */}
         {contacts.length > 0 && (

@@ -7,6 +7,7 @@ import ThemeToggle from '@/components/theme-toggle'
 import PageTransition from '@/components/page-transition'
 import OfflineIndicator from '@/components/offline-indicator'
 import OfflineSync from '@/components/offline-sync'
+import TimezoneCookie from '@/components/app/timezone-cookie'
 import BottomNav from '@/components/bottom-nav'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex flex-col min-h-screen bg-bg">
       <OfflineIndicator />
       <OfflineSync />
+      <TimezoneCookie />
       {/* Top bar */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="min-w-0 flex flex-col">

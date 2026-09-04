@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { localToday } from '@/lib/local-date'
 import { requireTripContext } from '@/lib/trip'
 import { stripJoin } from '@/lib/pack'
 import type { Database } from '@/lib/database.types'
@@ -15,7 +16,7 @@ export async function getTodayData() {
   const ctx = await requireTripContext()
   const supabase = await createClient()
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = await localToday()
 
   const [legsRes, itemsRes, packedRes] = await Promise.all([
     supabase.from('itinerary').select('*').eq('trip_id', ctx.tripId).order('day'),

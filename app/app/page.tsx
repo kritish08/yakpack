@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { getTodayData, fetchWeather } from '@/lib/today'
+import { formatDay } from '@/lib/local-date'
 import { deriveCarryTags } from '@/lib/weather'
 import WeatherHero from '@/components/today/weather-hero'
 import CarryChips from '@/components/today/carry-chips'
@@ -33,8 +34,19 @@ export default async function TodayPage() {
       {/* Header */}
       <div>
         <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text">Today</h1>
-        {isPast   && <p className="font-mono text-xs text-text-muted mt-0.5">Trip complete — showing last day</p>}
-        {isFuture && <p className="font-mono text-xs text-accent mt-0.5">Trip starts {todayLeg?.date} · showing Day 1 preview</p>}
+        {/* Same vocabulary as the Plan screen: a trip whose dates have passed has
+            ENDED, which is a fact about the calendar, and says nothing about
+            whether the packing was finished or whether it can still be edited. */}
+        {isPast && (
+          <p className="font-mono text-xs text-text-muted mt-0.5">
+            This trip ended {formatDay(todayLeg?.date ?? null)} · showing the last day
+          </p>
+        )}
+        {isFuture && (
+          <p className="font-mono text-xs text-accent mt-0.5">
+            Starts {formatDay(todayLeg?.date ?? null)} · showing day 1
+          </p>
+        )}
       </div>
 
       {/* Pemba mascot */}

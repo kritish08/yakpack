@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { localToday } from '@/lib/local-date'
 import { requireTripContext } from '@/lib/trip'
 import { stripJoin } from '@/lib/pack'
 import type { Database } from '@/lib/database.types'
@@ -37,7 +38,7 @@ export async function getToBuyData() {
     .map(cat => ({ ...cat, items: toBuyItems.filter(i => i.category_id === cat.id) }))
     .filter(cat => cat.items.length > 0)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = await localToday()
 
   return { ctx, categories, allItems, categoriesWithToBuy, packed, trip: ctx.trip, today }
 }
