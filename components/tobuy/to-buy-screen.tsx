@@ -8,6 +8,7 @@ import type { CategoryWithToBuy, Item, Packed, Category, Trip } from '@/lib/tobu
 import type { AssignedTo as MemberAssigned, MemberKey as MemberKeyT, MemberView } from '@/lib/database.types'
 import { overallProgress, personProgress, categoryProgress } from '@/lib/progress'
 import { addItem, updateItem, removeFromShopping } from '@/app/actions/items'
+import { applyStatusOps, enqueueOp, readQueue } from '@/lib/offline-queue'
 import { addCategory, updateCategory, deleteCategory } from '@/app/actions/categories'
 import { byokHeaders } from '@/lib/byok'
 
@@ -101,8 +102,15 @@ export default function SummaryScreen({
   const [localCategories, setLocalCategories] = useState<Category[]>(categories)
 
   // Sync when server re-fetches (router.refresh)
+  // Project the outbox over the server-rendered list.
+  //
+  // Offline, this page comes from the service worker's cache and carries the
+  // statuses from when it was last cached — before anything was marked bought.
+  // Replaying the queue keeps those purchases off the list until the flush
+  // lands; without it a reload puts everything you just bought back.
   useEffect(() => {
-    setToBuyItems(categoriesWithToBuy.flatMap(c => c.items))
+    const all = applyStatusOps(categoriesWithToBuy.flatMap(c => c.items), readQueue())
+    setToBuyItems(all.filter(i => i.status === 'to_buy'))
   }, [categoriesWithToBuy])
 
   useEffect(() => {
@@ -267,21 +275,28 @@ export default function SummaryScreen({
     }
   }
 
+  /**
+   * Marking something bought.
+   *
+   * On failure the tick is KEPT and the write is queued, rather than rolled
+   * back. This screen is used standing in a shop, which is where signal is
+   * worst, and the old behaviour made the item you had just bought reappear on
+   * the list — the app disagreeing with the bag in your hand. The queue replays
+   * on reconnect; <OfflineSync> handles that app-wide.
+   */
   function handleMarkBought(item: Item) {
-    const prev = toBuyItems
-    setToBuyItems(prev.filter(i => i.id !== item.id))
+    setToBuyItems(prev => prev.filter(i => i.id !== item.id))
     updateItem(item.id, { status: 'owned' })
       .then(() => startTransition(() => router.refresh()))
-      .catch(() => setToBuyItems(prev))
+      .catch(() => enqueueOp({ kind: 'status', item_id: item.id, status: 'owned' }))
   }
 
   // "Not buying / already have" — leaves the shopping list but stays in Pack.
   function handleRemoveFromShopping(item: Item) {
-    const prev = toBuyItems
-    setToBuyItems(prev.filter(i => i.id !== item.id))
+    setToBuyItems(prev => prev.filter(i => i.id !== item.id))
     removeFromShopping(item.id)
       .then(() => startTransition(() => router.refresh()))
-      .catch(() => setToBuyItems(prev))
+      .catch(() => enqueueOp({ kind: 'status', item_id: item.id, status: 'standard' }))
   }
 
   // ── Category sheet handlers ──────────────────────────────────────────────────

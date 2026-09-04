@@ -3,12 +3,13 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Check, Compass, FileText, Link2, Loader2, PencilLine, Upload,
+  ArrowLeft, Check, Compass, FileText, Link2, Loader2, PencilLine, Upload, WifiOff,
 } from 'lucide-react'
 import { byokHeaders, getKey } from '@/lib/byok'
 import { extractPdfText, PdfError, MAX_PDF_BYTES } from '@/lib/pdf'
 import { baseList, factsFromDays, sortItems } from '@/lib/packing-rules'
 import { hasDayMarkers, parseItineraryText } from '@/lib/parse-itinerary'
+import { useOnline } from '@/lib/use-online'
 import { createTripFromOnboarding } from '@/app/actions/onboarding'
 import { bootstrapTrip } from '@/app/actions/trip'
 import type { DraftContact, DraftDay, ParsedDay, ProposedItem } from '@/lib/import-types'
@@ -57,6 +58,7 @@ export default function NewTripFlow({
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
+  const online = useOnline()
   const hasKey = useMemo(() => aiEnabled && typeof window !== 'undefined' && Boolean(getKey()), [aiEnabled])
 
   /* ── Intake ─────────────────────────────────────────────────────────────── */
@@ -162,7 +164,9 @@ export default function NewTripFlow({
 
       present(json.days as ParsedDay[], json.gaps ?? [], json.tripName || fallbackName)
     } catch {
-      setError('Could not reach the server.')
+      setError(navigator.onLine
+        ? 'Could not reach the server.'
+        : 'You are offline — reading an itinerary needs a connection.')
     } finally {
       setBusy(null)
     }
@@ -200,7 +204,9 @@ export default function NewTripFlow({
       if (!res.ok) { setError(json?.error ?? 'That page could not be read.'); return }
       await structure(json.text, json.title ?? undefined)
     } catch {
-      setError('Could not reach the server.')
+      setError(navigator.onLine
+        ? 'Could not reach the server.'
+        : 'You are offline — fetching a page needs a connection.')
     } finally {
       setBusy(null)
     }
@@ -334,6 +340,19 @@ export default function NewTripFlow({
       <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text leading-none">
         {isFirstTrip ? 'Your first trip' : 'New trip'}
       </h1>
+
+      {/* Creating a trip is the one part of this app that genuinely needs a
+          connection — it writes rows. Saying so is better than letting three
+          buttons fail one after another with "could not reach the server". */}
+      {!online && (
+        <div className="mt-3 rounded-xl border border-accent-3/30 bg-accent-3/[0.06] p-3 flex items-start gap-2">
+          <WifiOff size={13} className="mt-0.5 shrink-0 text-accent-3" aria-hidden="true" />
+          <p className="font-body text-xs text-text-muted leading-relaxed">
+            You are offline. Making a trip needs a connection — reading a PDF, looking up
+            a place and saving all need one. Your existing trips still work offline.
+          </p>
+        </div>
+      )}
 
       {/* ── Choose how to start ── */}
       {stage === 'choose' && (
