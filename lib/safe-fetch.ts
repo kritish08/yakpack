@@ -109,7 +109,12 @@ function isBlockedIPv6(ip: string): boolean {
   return false
 }
 
-function isBlockedAddress(ip: string): boolean {
+/**
+ * Exported for tests. This predicate is the whole SSRF guard: everything else is
+ * plumbing around it, and a rule this consequential should be assertable on its
+ * own rather than only through a live fetch.
+ */
+export function isBlockedAddress(ip: string): boolean {
   const v = net.isIP(ip)
   if (v === 4) return isBlockedIPv4(ip)
   if (v === 6) return isBlockedIPv6(ip)

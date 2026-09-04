@@ -39,16 +39,22 @@ export async function localToday(): Promise<string> {
 /**
  * "Sat 27 Jun" — for telling someone when their trip ended.
  *
- * Read at midday UTC so the label cannot slip a day either side when it is
- * rendered from a different zone than it was written in.
+ * Deliberately takes no timezone. `itinerary.date` is a calendar date, not an
+ * instant: the 27th of June is the 27th of June whoever is reading it. Rendering
+ * it through a zone shifts it — anchoring at midday UTC survives ±12 but still
+ * slips a day at UTC+14, where a test caught it reading "Sun 28 Jun".
+ *
+ * So the parts are formatted directly and no conversion happens at all.
  */
-export function formatDay(date: string | null, timeZone?: string): string {
+export function formatDay(date: string | null): string {
   if (!date) return ''
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return date
   try {
     return new Intl.DateTimeFormat('en-GB', {
-      timeZone: timeZone || undefined,
+      timeZone: 'UTC',
       weekday: 'short', day: 'numeric', month: 'short',
-    }).format(new Date(date + 'T12:00:00Z'))
+    }).format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])))
   } catch {
     return date
   }

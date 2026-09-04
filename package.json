@@ -14,7 +14,9 @@
     "db:reset": "supabase db reset",
     "db:studio": "open http://127.0.0.1:54323",
     "dev:local": "dotenv -e .env.local.supabase -- next dev --turbopack",
-    "seed:local": "dotenv -e .env.local.supabase -- tsx lib/seed.ts"
+    "seed:local": "dotenv -e .env.local.supabase -- tsx lib/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -53,6 +55,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^5.0.0",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
@@ -60,6 +63,7 @@
     "supabase": "^2.116.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.0"
   }
 }

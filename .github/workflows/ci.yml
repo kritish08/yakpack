@@ -28,6 +28,9 @@ jobs:
 
       - run: pnpm type-check
 
+      - name: Test
+        run: pnpm test
+
       - run: pnpm build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

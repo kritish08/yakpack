@@ -1,0 +1,513 @@
+{
+  "Shimla": [
+    {
+      "name": "Shimla",
+      "country": "India",
+      "admin": "Himachal Pradesh",
+      "lat": 31.10442,
+      "lon": 77.16662,
+      "elevation": 2073
+    },
+    {
+      "name": "Shimla",
+      "country": "India",
+      "admin": "Rajasthan",
+      "lat": 28.69275,
+      "lon": 74.57112,
+      "elevation": 227
+    },
+    {
+      "name": "Shīmla",
+      "country": "India",
+      "admin": "Haryana",
+      "lat": 29.63715,
+      "lon": 76.22337,
+      "elevation": 232
+    },
+    {
+      "name": "Shimlai",
+      "country": "Pakistan",
+      "admin": "Khyber Pakhtunkhwa",
+      "lat": 34.17276,
+      "lon": 73.20228,
+      "elevation": 1352
+    },
+    {
+      "name": "Shimla Mota",
+      "country": "India",
+      "admin": "Gujarat",
+      "lat": 23.13139,
+      "lon": 73.57523,
+      "elevation": 85
+    },
+    {
+      "name": "Shimla Gujrān",
+      "country": "India",
+      "admin": "Haryana",
+      "lat": 29.31893,
+      "lon": 77.05661,
+      "elevation": 232
+    },
+    {
+      "name": "Shimla Pastaur",
+      "country": "India",
+      "admin": "Uttarakhand",
+      "lat": 28.95803,
+      "lon": 79.44545,
+      "elevation": 209
+    },
+    {
+      "name": "Shimla Airport",
+      "country": "India",
+      "admin": "Himachal Pradesh",
+      "lat": 31.0818,
+      "lon": 77.068,
+      "elevation": 1536
+    }
+  ],
+  "Chitkul": [
+    {
+      "name": "Chitkul",
+      "country": "India",
+      "admin": "Telangana",
+      "lat": 17.55867,
+      "lon": 78.22257,
+      "elevation": 529
+    },
+    {
+      "name": "Chitkal",
+      "country": "India",
+      "admin": "Himachal Pradesh",
+      "lat": 31.35312,
+      "lon": 78.43551,
+      "elevation": 3476
+    },
+    {
+      "name": "Chitkūl",
+      "country": "India",
+      "admin": "Telangana",
+      "lat": 17.89567,
+      "lon": 78.0944,
+      "elevation": 496
+    }
+  ],
+  "Tabo": [
+    {
+      "name": "Tabora",
+      "country": "Tanzania",
+      "admin": "Tabora",
+      "lat": -5.01622,
+      "lon": 32.82663,
+      "elevation": 1191
+    },
+    {
+      "name": "Tabo",
+      "country": "Ivory Coast",
+      "admin": "Lagunes District",
+      "lat": 6.2361,
+      "lon": -5.13745,
+      "elevation": 130
+    },
+    {
+      "name": "Tabo",
+      "country": "Tanzania",
+      "admin": "Songwe",
+      "lat": -8.7,
+      "lon": 32.8,
+      "elevation": 1157
+    },
+    {
+      "name": "Tabo",
+      "country": "Mozambique",
+      "admin": "Zambezia Province",
+      "lat": -17.07889,
+      "lon": 37.15778,
+      "elevation": 112
+    },
+    {
+      "name": "Tabo",
+      "country": "India",
+      "admin": "Himachal Pradesh",
+      "lat": 32.08994,
+      "lon": 78.37212,
+      "elevation": 3281
+    },
+    {
+      "name": "Tabo",
+      "country": "Myanmar",
+      "admin": "Magway",
+      "lat": 19.3275,
+      "lon": 95.2159,
+      "elevation": 44
+    },
+    {
+      "name": "Tobo",
+      "country": "Indonesia",
+      "admin": null,
+      "lat": -3.56667,
+      "lon": 130.18333,
+      "elevation": 9999
+    },
+    {
+      "name": "Tabo",
+      "country": "Philippines",
+      "admin": "Eastern Visayas",
+      "lat": 12.2598,
+      "lon": 125.4363,
+      "elevation": 13
+    },
+    {
+      "name": "Tabo",
+      "country": "Philippines",
+      "admin": "Eastern Visayas",
+      "lat": 10.95,
+      "lon": 124.98333,
+      "elevation": 18
+    },
+    {
+      "name": "Tabo",
+      "country": "China",
+      "admin": "Yunnan",
+      "lat": 23.3625,
+      "lon": 104.01778,
+      "elevation": 1612
+    }
+  ],
+  "Kaza": [
+    {
+      "name": "Kazan’",
+      "country": "Russia",
+      "admin": "Tatarstan Republic",
+      "lat": 55.78874,
+      "lon": 49.12214,
+      "elevation": 61
+    },
+    {
+      "name": "Kaz̲h̲ah",
+      "country": "Afghanistan",
+      "admin": "Khowst",
+      "lat": 33.59232,
+      "lon": 69.63497,
+      "elevation": 2366
+    },
+    {
+      "name": "Kazhah",
+      "country": "Afghanistan",
+      "admin": "Paktika",
+      "lat": 32.15381,
+      "lon": 68.79698,
+      "elevation": 2125
+    },
+    {
+      "name": "Kazha",
+      "country": "Pakistan",
+      "admin": "Balochistan",
+      "lat": 30.33948,
+      "lon": 67.97195,
+      "elevation": 2233
+    },
+    {
+      "name": "Ungwan Cesa",
+      "country": "Nigeria",
+      "admin": "Kaduna State",
+      "lat": 11.18147,
+      "lon": 7.29764,
+      "elevation": 657
+    },
+    {
+      "name": "Kaza",
+      "country": "Nigeria",
+      "admin": "Zamfara State",
+      "lat": 12.12248,
+      "lon": 6.08876,
+      "elevation": 335
+    },
+    {
+      "name": "Kaza",
+      "country": "Nigeria",
+      "admin": "Borno State",
+      "lat": 12.00783,
+      "lon": 14.20909,
+      "elevation": 293
+    },
+    {
+      "name": "Kaza",
+      "country": "Nigeria",
+      "admin": "Taraba State",
+      "lat": 8.09687,
+      "lon": 9.46449,
+      "elevation": 115
+    },
+    {
+      "name": "Kaza",
+      "country": "Togo",
+      "admin": null,
+      "lat": 8.43333,
+      "lon": 1.15,
+      "elevation": 258
+    },
+    {
+      "name": "Kaza",
+      "country": "Cameroon",
+      "admin": "Far North",
+      "lat": 11.36398,
+      "lon": 14.44231,
+      "elevation": 309
+    }
+  ],
+  "Chandratal": [],
+  "Manali": [
+    {
+      "name": "Manali",
+      "country": "India",
+      "admin": "Tamil Nadu",
+      "lat": 13.16667,
+      "lon": 80.26667,
+      "elevation": 6
+    },
+    {
+      "name": "Manali",
+      "country": "India",
+      "admin": "Himachal Pradesh",
+      "lat": 32.2574,
+      "lon": 77.17481,
+      "elevation": 2108
+    },
+    {
+      "name": "Manali",
+      "country": "India",
+      "admin": "Tamil Nadu",
+      "lat": 10.57779,
+      "lon": 79.65246,
+      "elevation": 10
+    },
+    {
+      "name": "Manali",
+      "country": "India",
+      "admin": "Tamil Nadu",
+      "lat": 13.3618,
+      "lon": 80.05283,
+      "elevation": 35
+    },
+    {
+      "name": "Manali",
+      "country": "India",
+      "admin": "Tamil Nadu",
+      "lat": 11.54764,
+      "lon": 76.48539,
+      "elevation": 928
+    },
+    {
+      "name": "Manali",
+      "country": "India",
+      "admin": "Kerala",
+      "lat": 11.33307,
+      "lon": 76.29453,
+      "elevation": 34
+    },
+    {
+      "name": "Manali",
+      "country": "India",
+      "admin": "Kerala",
+      "lat": 10.77739,
+      "lon": 76.66489,
+      "elevation": 96
+    },
+    {
+      "name": "Mānali",
+      "country": "India",
+      "admin": "Tamil Nadu",
+      "lat": 10.96178,
+      "lon": 79.74706,
+      "elevation": 8
+    },
+    {
+      "name": "Manali",
+      "country": "India",
+      "admin": "Tamil Nadu",
+      "lat": 11.37407,
+      "lon": 78.07246,
+      "elevation": 214
+    },
+    {
+      "name": "Mañalich",
+      "country": "Cuba",
+      "admin": "Mayabeque",
+      "lat": 22.81112,
+      "lon": -82.14748,
+      "elevation": 45
+    }
+  ],
+  "Leh": [
+    {
+      "name": "Le Havre",
+      "country": "France",
+      "admin": "Normandy",
+      "lat": 49.49346,
+      "lon": 0.10785,
+      "elevation": 5
+    },
+    {
+      "name": "Leh",
+      "country": "India",
+      "admin": "Ladakh",
+      "lat": 34.16504,
+      "lon": 77.58402,
+      "elevation": 3502
+    },
+    {
+      "name": "Léh",
+      "country": "Hungary",
+      "admin": "Borsod-Abaúj-Zemplén",
+      "lat": 48.29069,
+      "lon": 20.98069,
+      "elevation": 137
+    },
+    {
+      "name": "Leh",
+      "country": "Austria",
+      "admin": "State of Salzburg",
+      "lat": 47.38333,
+      "lon": 13.15,
+      "elevation": 895
+    },
+    {
+      "name": "Leh",
+      "country": "Pakistan",
+      "admin": "Punjab",
+      "lat": 32.16217,
+      "lon": 74.97199,
+      "elevation": 244
+    },
+    {
+      "name": "Le Havre – Octeville Airport",
+      "country": "France",
+      "admin": "Normandy",
+      "lat": 49.53389,
+      "lon": 0.08806,
+      "elevation": 95
+    },
+    {
+      "name": "Leh",
+      "country": "Switzerland",
+      "admin": "Canton of St. Gallen",
+      "lat": 47.38994,
+      "lon": 9.18586,
+      "elevation": 801
+    },
+    {
+      "name": "Leh",
+      "country": "Switzerland",
+      "admin": "Canton of St. Gallen",
+      "lat": 47.457,
+      "lon": 9.48615,
+      "elevation": 696
+    },
+    {
+      "name": "Lehi",
+      "country": "United States",
+      "admin": "Utah",
+      "lat": 40.39162,
+      "lon": -111.85077,
+      "elevation": 1391
+    },
+    {
+      "name": "Lehr",
+      "country": "United States",
+      "admin": "North Dakota",
+      "lat": 46.27969,
+      "lon": -99.35233,
+      "elevation": 630
+    }
+  ],
+  "Nubra": [
+    {
+      "name": "Nubraen",
+      "country": "Indonesia",
+      "admin": "East Nusa Tenggara",
+      "lat": -10.33396,
+      "lon": 123.71482,
+      "elevation": 135
+    }
+  ],
+  "Kargil": [
+    {
+      "name": "Kargil",
+      "country": "India",
+      "admin": "Ladakh",
+      "lat": 34.55765,
+      "lon": 76.12622,
+      "elevation": 2686
+    },
+    {
+      "name": "Kargil",
+      "country": "India",
+      "admin": "Madhya Pradesh",
+      "lat": 24.41224,
+      "lon": 81.79644,
+      "elevation": 279
+    },
+    {
+      "name": "Kargilo Khann",
+      "country": "India",
+      "admin": "Ladakh",
+      "lat": 34.56944,
+      "lon": 76.09028,
+      "elevation": 3859
+    }
+  ],
+  "Chamonix": [
+    {
+      "name": "Chamonix",
+      "country": "France",
+      "admin": "Rhône-Alpes",
+      "lat": 45.92375,
+      "lon": 6.86933,
+      "elevation": 1060
+    }
+  ],
+  "Zermatt": [
+    {
+      "name": "Zermatt",
+      "country": "Switzerland",
+      "admin": "Valais",
+      "lat": 46.01998,
+      "lon": 7.74863,
+      "elevation": 1608
+    },
+    {
+      "name": "Zermatt",
+      "country": "Switzerland",
+      "admin": "Valais",
+      "lat": 46.02928,
+      "lon": 7.7533,
+      "elevation": 1608
+    }
+  ],
+  "Grindelwald": [
+    {
+      "name": "Grindelwald",
+      "country": "Switzerland",
+      "admin": "Canton of Bern",
+      "lat": 46.62396,
+      "lon": 8.03601,
+      "elevation": 1047
+    },
+    {
+      "name": "Grindelwald",
+      "country": "Australia",
+      "admin": "Tasmania",
+      "lat": -41.98659,
+      "lon": 147.05595,
+      "elevation": 516
+    },
+    {
+      "name": "Grindelwald",
+      "country": "Australia",
+      "admin": "Tasmania",
+      "lat": -41.35147,
+      "lon": 147.00523,
+      "elevation": 185
+    }
+  ]
+}

@@ -31,6 +31,7 @@ should not be reintroduced without being asked.
 
 ```bash
 pnpm dev             # dev server with Turbopack
+pnpm test            # vitest, ~170 pure-logic assertions, no network
 pnpm build           # production build
 pnpm lint            # eslint (flat config; `next lint` was removed in Next 16)
 pnpm type-check      # tsc --noEmit
@@ -323,6 +324,30 @@ is why there is no `userId` parameter. Trips the caller organises are deleted wi
 (`trips.created_by` is ON DELETE SET NULL, so they would otherwise survive as ownerless
 rows nobody can reach); trips they were invited to are left alone, with only their
 membership and packed rows withdrawn.
+
+## Tests
+
+`pnpm test` (Vitest, in CI between type-check and build). Deliberately all pure
+logic and no network: the suite covers the reasoning that is expensive to get wrong
+and invisible when it is.
+
+| File | What it pins down |
+|---|---|
+| `safe-fetch` | every SSRF address rule, including the IPv6 forms that carry an IPv4 address — `::ffff:a9fe:a9fe` is what a URL turns cloud metadata into, and matching only the dotted spelling let it through once |
+| `geocode-route` | route-aware place resolution, against real captured Open-Meteo responses. Tabo must land in Himachal and not Ivory Coast |
+| `parse-itinerary` | the keyless importer, including "the altitude that matters is where you sleep, not the pass you crossed" |
+| `offline-queue` | the outbox, including draining the superseded storage key and retaining an op whose replay failed |
+| `packing-rules` | the no-AI floor: Spiti gets an insulated jacket, Tokyo does not |
+| `local-date` | the traveller's own timezone, and that a calendar date never shifts |
+| `safe-next` | the open-redirect forms `startsWith('/')` misses |
+| `text-extraction`, `sanitize`, `ams` | entity decoding, prompt-injection flattening, carry-tag thresholds |
+
+Fixtures in `tests/fixtures/` are real API responses captured once. Keep it that
+way — a test that also needs Open-Meteo to be up fails on a train, for reasons
+unrelated to the code.
+
+`server-only` is aliased to a stub in `vitest.config.mts`; without it every server
+module is untestable, which is how security code ends up with no tests.
 
 ## Feature Flags
 

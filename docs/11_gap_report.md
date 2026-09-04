@@ -1,8 +1,7 @@
 # Gap report — what is left before YakPack is publishable
 
-> **Status, 2026-09-04:** P0, P1, P2 and P3 (items 1–10) are **done** — see the
-> commits following this report. What remains is P4 alone: a test suite, the git
-> history scrub, and the deploy.
+> **Status, 2026-09-04:** items 1–11 are **done**, the test suite included. What
+> remains is the git history scrub and the deploy.
 
 Written 2026-09-04, after the multi-tenancy, BYOK, contacts and onboarding work.
 
