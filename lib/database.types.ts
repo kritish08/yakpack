@@ -8,11 +8,11 @@
  * which is `profiles.app_role = 'admin'` and an unrelated axis.
  */
 
-/** A person's slot within one trip: who created it, plus up to two partners. */
-export type MemberKey = 'organiser' | 'partner_1' | 'partner_2'
+/** A person's slot within one trip: who created it, plus up to three partners. */
+export type MemberKey = 'organiser' | 'partner_1' | 'partner_2' | 'partner_3'
 
 /** Slots a partner can occupy, in the order they are handed out. */
-export const PARTNER_KEYS = ['partner_1', 'partner_2'] as const
+export const PARTNER_KEYS = ['partner_1', 'partner_2', 'partner_3'] as const
 
 /** Most partners a single trip may hold. */
 export const MAX_PARTNERS = PARTNER_KEYS.length
@@ -199,7 +199,7 @@ export type Database = {
         Row: {
           id: string
           trip_id: string
-          member_key: 'partner_1' | 'partner_2'
+          member_key: 'partner_1' | 'partner_2' | 'partner_3'
           email: string | null
           token: string
           status: 'pending' | 'accepted' | 'revoked'
@@ -212,7 +212,7 @@ export type Database = {
         Insert: {
           id?: string
           trip_id: string
-          member_key: 'partner_1' | 'partner_2'
+          member_key: 'partner_1' | 'partner_2' | 'partner_3'
           email?: string | null
           token?: string
           status?: 'pending' | 'accepted' | 'revoked'

@@ -7,7 +7,7 @@ export type Trip = Database['public']['Tables']['trips']['Row']
 export type TripMember = Database['public']['Tables']['trip_members']['Row']
 
 /** Slot order for display; also the order invites are handed out in. */
-const SLOT_ORDER: MemberKey[] = ['organiser', 'partner_1', 'partner_2']
+const SLOT_ORDER: MemberKey[] = ['organiser', 'partner_1', 'partner_2', 'partner_3']
 
 export interface TripContext {
   userId: string
@@ -97,7 +97,7 @@ export async function getTripContext(fresh = false): Promise<TripContext> {
 /** Fallback label for a slot whose holder has not set a display name. */
 export function slotLabel(key: MemberKey): string {
   if (key === 'organiser') return 'Organiser'
-  return key === 'partner_1' ? 'Partner 1' : 'Partner 2'
+  return key === 'partner_1' ? 'Partner 1' : key === 'partner_2' ? 'Partner 2' : 'Partner 3'
 }
 
 /**

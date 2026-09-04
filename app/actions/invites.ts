@@ -7,7 +7,7 @@ import type { MemberKey } from '@/lib/database.types'
 
 export interface PendingInvite {
   id: string
-  memberKey: 'partner_1' | 'partner_2'
+  memberKey: 'partner_1' | 'partner_2' | 'partner_3'
   email: string | null
   token: string
   expiresAt: string
@@ -43,7 +43,7 @@ export async function getPartnersState(): Promise<PartnersState> {
     .eq('status', 'pending')
 
   const invites: PendingInvite[] = ((data ?? []) as {
-    id: string; member_key: 'partner_1' | 'partner_2'; email: string | null; token: string; expires_at: string
+    id: string; member_key: 'partner_1' | 'partner_2' | 'partner_3'; email: string | null; token: string; expires_at: string
   }[]).map(i => ({
     id: i.id, memberKey: i.member_key, email: i.email, token: i.token, expiresAt: i.expires_at,
   }))

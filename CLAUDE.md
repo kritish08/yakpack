@@ -10,7 +10,7 @@ Next.js 16 (App Router, React 19) on Supabase (Postgres + Auth + Realtime), with
 optional OpenAI layer users bring their own key for.
 
 It is **multi-tenant**: registration is open, and each account gets its own trip
-copied from a template. A trip holds one or two people.
+copied from a template. A trip holds up to four people: an organiser and up to three partners.
 
 `/docs` holds the original build spec (`01`–`08`) plus two audit reports (`09`, `10`).
 Treat those as **historical**: they describe intent and past findings, and several
@@ -158,14 +158,14 @@ Summary · Plan · Ask (Ask is absent entirely when AI is off — never degraded
 
 | | Column | Values | Meaning |
 |---|---|---|---|
-| Trip slot | `trip_members.member_key` | `organiser` / `partner_1` / `partner_2` | Who you are *within one trip* |
+| Trip slot | `trip_members.member_key` | `organiser` / `partner_1` / `partner_2` / `partner_3` | Who you are *within one trip* |
 | App standing | `profiles.app_role` | `admin` / `user` | Who you are *in the deployment* |
 
 Vocabulary, because these collide easily:
 
 - **admin** — operates the deployment. Manages the server API key and accounts.
 - **organiser** — signed up and created a trip. Invites partners into it.
-- **partner** — invited into someone else's trip. Up to two per trip.
+- **partner** — invited into someone else's trip. Up to three per trip.
 
 The word **owner** is deliberately unused: it reads as owner-of-the-application,
 which is `app_role`, an unrelated axis. A person is simultaneously the `organiser`
@@ -188,7 +188,7 @@ cannot read its rows, insert into it, or add themselves to it as a member.
 
 **Partner invites.** `create_trip_invite()` allocates the first free slot
 (`partner_1` then `partner_2`), where "free" means held by neither a member nor a
-live invite — that is what caps a trip at two partners. It returns a 256-bit token;
+live invite — that is what caps a trip at three partners. It returns a 256-bit token;
 there is no mail provider wired in, so the organiser shares the link themselves.
 
 `accept_trip_invite()` is SECURITY DEFINER because the invitee is by definition not
@@ -357,8 +357,11 @@ squashed initial commit) before flipping visibility.
 ## Colour Tokens (quick ref)
 
 Dark: `--bg #0f0e0c` · `--surface #171614` · `--accent #d4943a` (amber) ·
-`--accent-2 #4a9e7e` (packed) · `--accent-3 #9e4a4a` (warning) · `--accent-4 #4a6e9e` (info/cold).
-Per-person chips: Kritish → amber · partner → blue · shared → green.
+`--accent-2 #4a9e7e` (packed) · `--accent-3 #9e4a4a` (warning) · `--accent-4 #4a6e9e` (info/cold) · `--accent-5 #7e4a9e`
+(fourth person).
+Per-person chips: organiser → amber · partner_1 → blue (`accent-4`) · partner_2 → green
+(`accent-2`) · partner_3 → violet (`accent-5`) · shared → green. `accent-3` is the warning
+colour and is deliberately never a person.
 
 ---
 

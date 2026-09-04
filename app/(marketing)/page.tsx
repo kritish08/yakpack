@@ -14,7 +14,7 @@ const FEATURES = [
     label: 'Your people',
     title: 'Shared kit only gets packed once',
     body:
-      'Invite up to two others by link. Every item belongs to one person or to everyone: personal items track a packed state each, shared items track one between you. Check something off and it lands on their phone in under a second.',
+      'Invite up to three others by link. Every item belongs to one person or to everyone: personal items track a packed state each, shared items track one between you. Check something off and it lands on their phone in under a second.',
     data: 'organiser  +  partner_1  +  partner_2',
   },
   {

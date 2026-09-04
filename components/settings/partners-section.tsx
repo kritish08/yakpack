@@ -12,14 +12,16 @@ const SLOT_TEXT: Record<MemberKey, string> = {
   organiser: 'text-accent',
   partner_1: 'text-accent-4',
   partner_2: 'text-accent-2',
+  partner_3: 'text-accent-5',
 }
 
 function slotName(key: MemberKey) {
-  return key === 'organiser' ? 'Organiser' : key === 'partner_1' ? 'Partner 1' : 'Partner 2'
+  if (key === 'organiser') return 'Organiser'
+  return key === 'partner_1' ? 'Partner 1' : key === 'partner_2' ? 'Partner 2' : 'Partner 3'
 }
 
 /**
- * Invite up to two partners into this trip.
+ * Invite up to three partners into this trip.
  *
  * There is no mail provider wired in, so an invite produces a link the organiser
  * shares themselves. Saying so plainly beats a "sent!" toast for an email that
@@ -69,7 +71,7 @@ export default function PartnersSection() {
         Partners
       </h2>
       <p className="font-body text-xs text-text-muted leading-relaxed mb-3">
-        Up to two people can share this trip. Shared items are carried once between
+        Up to four of you can share this trip. Shared items are carried once between
         you; personal items are tracked separately for each person.
       </p>
 
@@ -155,7 +157,7 @@ export default function PartnersSection() {
 
         {state && !state.canInvite && state.isOrganiser && (
           <p className="font-mono text-[11px] text-text-dim border-t border-border/50 pt-3 flex items-center gap-1.5">
-            <Users size={12} /> This trip is full — two partners is the limit.
+            <Users size={12} /> This trip is full — three partners is the limit.
           </p>
         )}
 

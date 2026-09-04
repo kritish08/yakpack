@@ -24,6 +24,7 @@ const SLOT_COLOUR: Record<MemberKey, { on: string; off: string }> = {
   organiser: { on: 'bg-accent   border-accent   text-bg', off: 'border-accent/40   text-accent/60'   },
   partner_1: { on: 'bg-accent-4 border-accent-4 text-bg', off: 'border-accent-4/40 text-accent-4/60' },
   partner_2: { on: 'bg-accent-2 border-accent-2 text-bg', off: 'border-accent-2/40 text-accent-2/60' },
+  partner_3: { on: 'bg-accent-5 border-accent-5 text-bg', off: 'border-accent-5/40 text-accent-5/60' },
 }
 
 function PersonDot({ initial, isPacked, isMe, slot }: {

@@ -11,7 +11,7 @@ export interface UpdateItemInput {
     name?: string
     qty?: string | null
     status?: 'owned' | 'to_buy' | 'standard'
-    assigned_to?: 'organiser' | 'partner_1' | 'partner_2' | 'shared'
+    assigned_to?: 'organiser' | 'partner_1' | 'partner_2' | 'partner_3' | 'shared'
     category_id?: number
   }
   reason: string

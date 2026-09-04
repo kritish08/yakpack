@@ -48,7 +48,7 @@ const STORAGE_KEY = 'yakpack:outbox:v2'
 const LEGACY_KEY = 'yakpack:packed-outbox:v1'
 
 const STATUSES: ItemStatus[] = ['owned', 'to_buy', 'standard']
-const USER_KEYS: AssignedTo[] = ['organiser', 'partner_1', 'partner_2', 'shared']
+const USER_KEYS: AssignedTo[] = ['organiser', 'partner_1', 'partner_2', 'partner_3', 'shared']
 
 function hasStorage(): boolean {
   try {

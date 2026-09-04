@@ -17,11 +17,13 @@ const SLOT_BAR: Record<MemberKeyT, string> = {
   organiser: 'bg-accent',
   partner_1: 'bg-accent-4',
   partner_2: 'bg-accent-2',
+  partner_3: 'bg-accent-5',
 }
 const SLOT_STYLE: Record<MemberKeyT, { bar: string; border: string; text: string }> = {
   organiser: { bar: 'bg-accent',   border: 'border-accent/20',   text: 'text-accent'   },
   partner_1: { bar: 'bg-accent-4', border: 'border-accent-4/20', text: 'text-accent-4' },
   partner_2: { bar: 'bg-accent-2', border: 'border-accent-2/20', text: 'text-accent-2' },
+  partner_3: { bar: 'bg-accent-5', border: 'border-accent-5/20', text: 'text-accent-5' },
 }
 
 // ── Chips ──────────────────────────────────────────────────────────────────────

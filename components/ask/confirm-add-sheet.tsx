@@ -7,7 +7,7 @@ interface SuggestedItem {
   name: string
   qty?: string
   status?: 'owned' | 'to_buy' | 'standard'
-  assigned_to?: 'organiser' | 'partner_1' | 'partner_2' | 'shared'
+  assigned_to?: 'organiser' | 'partner_1' | 'partner_2' | 'partner_3' | 'shared'
 }
 
 interface ConfirmAddSheetProps {
