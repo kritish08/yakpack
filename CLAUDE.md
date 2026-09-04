@@ -380,11 +380,20 @@ TRIP_NAME=
 TRIP_DEPART_DATE=
 ```
 
-## Before making the repo public
+## History
 
-Two third-party phone numbers were committed in `47df9ad` and `51124ca`. The working
-tree is clean, but **the history is not** — scrub those two commits (filter-repo or a
-squashed initial commit) before flipping visibility.
+The two third-party phone numbers that were committed early on have been removed
+from every commit (`git filter-repo`, replaced with `[redacted]`), and `main` was
+force-pushed on 2026-09-04. A fresh clone was scanned afterwards: 287 blobs, none
+carrying either number. A stale Vercel bot branch that also held them was deleted.
+
+The rewrite changed history only — the tree at HEAD hashed identically before and
+after, so no working file was touched.
+
+⚠️ Every commit SHA before that date changed. Any clone taken earlier still holds
+the old objects, and GitHub keeps unreachable objects for a while: if the numbers
+ever need to be unrecoverable rather than merely unreachable, that requires asking
+GitHub Support to purge them.
 
 ---
 

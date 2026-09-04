@@ -1,7 +1,7 @@
 # Gap report — what is left before YakPack is publishable
 
-> **Status, 2026-09-04:** items 1–11 are **done**, the test suite included. What
-> remains is the git history scrub and the deploy.
+> **Status, 2026-09-04:** items 1–12 are **done** — the test suite and the history
+> scrub included. What remains is item 13: the deploy.
 
 Written 2026-09-04, after the multi-tenancy, BYOK, contacts and onboarding work.
 
