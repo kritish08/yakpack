@@ -9,16 +9,21 @@ Vercel and open source under MIT. This is the **built application**, not a spec:
 Next.js 16 (App Router, React 19) on Supabase (Postgres + Auth + Realtime), with an
 optional OpenAI layer users bring their own key for.
 
-It is **multi-tenant**: registration is open, and each account gets its own trip
-copied from a template. A trip holds up to four people: an organiser and up to three partners.
+It is **multi-tenant**: registration is open, and each new account is taken to
+onboarding to choose how its first trip starts — a PDF, a link, by hand, or a copy
+of the seeded example. A trip holds up to four people: an organiser and up to three
+partners.
 
 `/docs` holds the original build spec (`01`–`08`) plus two audit reports (`09`, `10`).
 Treat those as **historical**: they describe intent and past findings, and several
 items in them are now fixed or deliberately superseded. The code is the source of truth.
 
-Milestones **M0–M8 are complete**. **M9 (voice) was never built** — there is no
-`/api/voice`, no `VOICE_ENABLED` flag, and no Azure Speech dependency. Don't
-reintroduce them without being asked.
+The original build was planned as milestones M0–M9. That framing is spent — the app
+has since been made multi-tenant, given BYOK, a landing page, multiple trips per
+account, importing, onboarding and account lifecycle — so don't reason about scope
+in those terms. The one part still worth stating: **voice (M9) was never built**.
+There is no `/api/voice`, no `VOICE_ENABLED` flag and no speech dependency, and it
+should not be reintroduced without being asked.
 
 ---
 
@@ -130,11 +135,21 @@ lost. Server actions are POSTs and are **not** queued; they simply fail offline.
 variables. Dark-first; light via `next-themes` (`data-theme`). Full tables in
 `docs/05_branding_design.md`.
 
-**Two users, closed system.** Supabase public signup is disabled; two accounts are
-pre-created. `profiles.role` is `'kritish' | 'partner'` and is **immutable after
-creation** (enforced by a trigger).
+**Open registration, per-trip identity.** Signup is open and anyone can create an
+account. There is no global `profiles.role` — that column was dropped. Who you are
+*within a trip* is `trip_members.member_key`; what you are *in the deployment* is
+`profiles.app_role`, which a signed-in user cannot grant themselves (enforced by the
+`profiles_prevent_app_role_change` trigger). See the two-axes table below.
 
 **Optimistic + instant.** No toggle spinners; realtime reconciles in the background.
+A write that fails offline is queued in `lib/offline-queue.ts` and the optimistic
+state is **kept**, never rolled back — see the Offline section.
+
+**Dates are the traveller's, not the server's.** Anything that decides which day it
+is goes through `localToday()` in `lib/local-date.ts`, which reads the browser's own
+timezone from a cookie. `new Date().toISOString()` is UTC, and on Vercel so is the
+server: using it showed a traveller in Spiti yesterday's leg until 05:30 every
+morning.
 
 **Mobile-first, ≥ 44 px targets, safe-area insets.** Bottom tabs: Today · Pack ·
 Summary · Plan · Ask (Ask is absent entirely when AI is off — never degraded).

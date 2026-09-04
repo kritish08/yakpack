@@ -218,9 +218,10 @@ export default function LandingPage() {
                   else&apos;s credits is not one worth publishing.
                 </p>
                 <p>
-                  Add an OpenAI key when you sign up and pick the model you want to pay
-                  for. Everything else — the pack list, the plan, the offline sync, the
-                  weather — works without a key at all.
+                  Add a key in Settings whenever you want it, and pick the model you pay
+                  for. Everything else works without one — the pack list, the plan, the
+                  offline sync, the weather, and importing an itinerary from a PDF or a
+                  link, which is read by rules on your own device rather than by a model.
                 </p>
               </div>
 

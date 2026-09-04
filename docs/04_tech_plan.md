@@ -1,5 +1,13 @@
 # YakPack — Tech Implementation Plan
 
+> **Superseded in places — read as history, not as the schema.** This documents the
+> original single-trip, two-person design. Since then the app became multi-tenant and
+> the data model moved: `trip` became `trips` with per-trip scoping, `profiles.role`
+> was dropped for `trip_members.member_key` and `profiles.app_role`, and the
+> `coordinator_*` / `leader_*` columns below became rows in `trip_contacts`. The
+> migrations in `supabase/migrations/` are the schema; `CLAUDE.md` is the current map.
+
+
 ## 1. Stack (and why)
 
 | Layer | Choice | Why |

@@ -364,7 +364,7 @@ export default function SummaryScreen({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display font-bold text-2xl uppercase tracking-tight text-text leading-none">Summary</h1>
-          <p className="font-mono text-xs text-text-muted mt-1">{trip?.name ?? 'Spiti Valley'}</p>
+          <p className="font-mono text-xs text-text-muted mt-1">{trip?.name ?? 'Your trip'}</p>
         </div>
         <TripChip trip={trip} today={today} />
       </div>
