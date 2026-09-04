@@ -152,6 +152,21 @@ function extractPlace(leg: string): string | null {
   return words.length >= 2 && words.length <= 60 ? words : null
 }
 
+/**
+ * Whether the text is explicitly numbered by day.
+ *
+ * The difference between "Day 1 — Delhi to Shimla" and an arbitrary web page is
+ * the difference between parsing and guessing. With markers, the rules are
+ * reliable enough to use unattended; without them, the one-line-per-day fallback
+ * would happily turn a page of navigation links into an itinerary. So callers
+ * ask first, and only trust the rules when the source is actually shaped like a
+ * day-by-day plan.
+ */
+export function hasDayMarkers(text: string): boolean {
+  const lines = text.split('\n').filter(l => /^\s*day\s*\d{1,2}\b/i.test(l))
+  return lines.length >= 2
+}
+
 const DAY_MARKER = /^\s*(?:day\s*)?(\d{1,2})\s*(?:[-–—:.)\]]|\s)\s*(.+)$/i
 
 /**

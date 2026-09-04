@@ -8,6 +8,7 @@ import {
 import { byokHeaders, getKey } from '@/lib/byok'
 import { extractPdfText, PdfError, MAX_PDF_BYTES } from '@/lib/pdf'
 import { baseList, factsFromDays, sortItems } from '@/lib/packing-rules'
+import { hasDayMarkers, parseItineraryText } from '@/lib/parse-itinerary'
 import { createTripFromOnboarding } from '@/app/actions/onboarding'
 import type { DraftContact, DraftDay, ParsedDay, ProposedItem } from '@/lib/import-types'
 import DayReview from './day-review'
@@ -57,10 +58,97 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
 
   /* ── Intake ─────────────────────────────────────────────────────────────── */
 
+  /** Turns parsed days into the review screen, once locations are resolved. */
+  function present(parsed: ParsedDay[], gapList: string[], name?: string) {
+    setDays(parsed)
+    setGaps(gapList)
+    setTripName(prev => prev || name || '')
+    // Confident matches start ticked; anything doubtful stays off, so the
+    // default outcome is "no data" rather than "wrong data".
+    setAccepted(Object.fromEntries(parsed.map(d => [d.day, Boolean(d.suggestion?.nameMatches)])))
+    setStage('days')
+  }
+
+  /**
+   * Reads an itinerary with rules alone — no model, no key, no cost.
+   *
+   * Only when the source is explicitly numbered by day, which is how operators,
+   * blogs and confirmation emails actually write them. That covers the common
+   * case, and it matters more than it looks: keys are BYOK, so "no key" is the
+   * default state of every new account. An importer that cannot run until the
+   * user has been to another company's website and pasted a credential is an
+   * importer most people never see.
+   *
+   * Locations still resolve through /api/geocode, which is route-aware and also
+   * needs no key. Returns false when the text is not day-shaped, so the caller
+   * can fall back to the model.
+   */
+  async function structureWithRules(text: string, fallbackName?: string): Promise<boolean> {
+    if (!hasDayMarkers(text)) return false
+    const rows = parseItineraryText(text)
+    if (rows.length < 2) return false
+
+    let suggestions: (ParsedDay['suggestion'])[] = rows.map(() => null)
+    try {
+      const res = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ places: rows.map(r => r.place) }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        suggestions = (json.suggestions as any[]).map((sg, i) =>
+          sg && sg.elevation != null
+            ? { query: rows[i].place ?? '', name: sg.name, country: sg.country, admin: sg.admin,
+                lat: sg.lat, lon: sg.lon, elevation: sg.elevation,
+                // Off-route means the geocoder found *a* place, not *the* place;
+                // it must never arrive pre-ticked.
+                nameMatches: Boolean(sg.nameMatches) && sg.distanceKm <= 400 }
+            : null)
+      }
+    } catch {
+      // A failed lookup is not a failed import — the days are still good, they
+      // simply arrive without coordinates.
+    }
+
+    const gapList: string[] = []
+    const parsed: ParsedDay[] = rows.map((r, i) => {
+      const sg = suggestions[i]
+      if (!r.place) gapList.push(`Day ${r.day}: no place named — no weather or altitude.`)
+      else if (!sg) gapList.push(`Day ${r.day}: couldn't find “${r.place}”.`)
+      else if (!sg.nameMatches) gapList.push(`Day ${r.day}: “${r.place}” best matched “${sg.name}${sg.country ? ', ' + sg.country : ''}” — check before accepting.`)
+      if (!r.date) gapList.push(`Day ${r.day}: no date, so it won't line up with “today”.`)
+
+      return {
+        day: r.day, date: r.date, leg: r.leg, place: r.place,
+        highlights: null, warnings: null, network: null,
+        // An altitude written in the source outranks anything looked up.
+        lat: null, lon: null, altitude_m: r.altitude,
+        suggestion: sg,
+      }
+    })
+
+    present(parsed, gapList, fallbackName)
+    return true
+  }
+
   /** Text from any source → structured days → the review screen. */
   async function structure(text: string, fallbackName?: string) {
     setBusy('Reading the itinerary…')
     try {
+      // Rules first: free, instant, and right for anything already written as a
+      // day-by-day. The model is the fallback for prose, not the default.
+      if (await structureWithRules(text, fallbackName)) return
+
+      if (!hasKey) {
+        setError(
+          'That source is not written as a numbered day-by-day, so it needs Pemba to read it — ' +
+          'add your OpenAI key in Settings. Or build the trip yourself and paste the days in, which needs no key.',
+        )
+        return
+      }
+
       const res = await fetch('/api/ai/import-itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...byokHeaders() },
@@ -69,14 +157,7 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
       const json = await res.json()
       if (!res.ok) { setError(json?.error ?? 'Could not read that itinerary.'); return }
 
-      const parsed = json.days as ParsedDay[]
-      setDays(parsed)
-      setGaps(json.gaps ?? [])
-      setTripName(prev => prev || json.tripName || fallbackName || '')
-      // Confident matches start ticked; anything doubtful stays off, so the
-      // default outcome is "no data" rather than "wrong data".
-      setAccepted(Object.fromEntries(parsed.map(d => [d.day, Boolean(d.suggestion?.nameMatches)])))
-      setStage('days')
+      present(json.days as ParsedDay[], json.gaps ?? [], json.tripName || fallbackName)
     } catch {
       setError('Could not reach the server.')
     } finally {
@@ -246,22 +327,18 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
           </p>
 
           <div className="flex flex-col gap-3">
-            {aiEnabled && (
-              <>
-                <Choice
-                  icon={<FileText size={18} aria-hidden="true" />}
-                  title="Upload a PDF"
-                  body="An operator's itinerary or a booking confirmation. Read on your device — the file itself never leaves it. Up to 20 MB."
-                  onClick={() => { setStage('pdf'); setError(null) }}
-                />
-                <Choice
-                  icon={<Link2 size={18} aria-hidden="true" />}
-                  title="Paste a link"
-                  body="A public itinerary page. We read the text off it and show you what we understood."
-                  onClick={() => { setStage('url'); setError(null) }}
-                />
-              </>
-            )}
+            <Choice
+              icon={<FileText size={18} aria-hidden="true" />}
+              title="Upload a PDF"
+              body="An operator's itinerary or a booking confirmation. Read on your device — the file itself never leaves it. Up to 20 MB."
+              onClick={() => { setStage('pdf'); setError(null) }}
+            />
+            <Choice
+              icon={<Link2 size={18} aria-hidden="true" />}
+              title="Paste a link"
+              body="A public itinerary page. We read the text off it and show you what we understood."
+              onClick={() => { setStage('url'); setError(null) }}
+            />
             <Choice
               icon={<PencilLine size={18} aria-hidden="true" />}
               title="Build it myself"
@@ -270,12 +347,11 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
             />
           </div>
 
-          {aiEnabled && !hasKey && (
-            <p className="font-mono text-[11px] text-text-dim mt-4 leading-relaxed">
-              PDF and link need your own OpenAI key to read the itinerary — add one in
-              Settings. Building it yourself works without one, and so does the packing list.
-            </p>
-          )}
+          <p className="font-mono text-[11px] text-text-dim mt-4 leading-relaxed">
+            Anything written as a numbered day-by-day is read here on your device — no
+            account with anyone else, no key, no cost.
+            {aiEnabled && !hasKey && ' For a brochure written as prose, add your OpenAI key in Settings and Pemba will read that too.'}
+          </p>
         </>
       )}
 
@@ -299,8 +375,9 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
             <Upload size={15} aria-hidden="true" /> Choose a PDF
           </label>
           <p className="font-mono text-[11px] text-text-dim mt-2">
-            Up to {Math.round(MAX_PDF_BYTES / 1024 / 1024)} MB. Scanned brochures have no
-            text to read — those need the manual route.
+            Up to {Math.round(MAX_PDF_BYTES / 1024 / 1024)} MB. A numbered day-by-day is read
+            without any key. Scanned brochures have no text in them at all — those need the
+            manual route.
           </p>
           {busyBar}{errorBar}
         </>
