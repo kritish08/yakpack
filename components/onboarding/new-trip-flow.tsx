@@ -3,13 +3,14 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Check, FileText, Link2, Loader2, PencilLine, Upload,
+  ArrowLeft, Check, Compass, FileText, Link2, Loader2, PencilLine, Upload,
 } from 'lucide-react'
 import { byokHeaders, getKey } from '@/lib/byok'
 import { extractPdfText, PdfError, MAX_PDF_BYTES } from '@/lib/pdf'
 import { baseList, factsFromDays, sortItems } from '@/lib/packing-rules'
 import { hasDayMarkers, parseItineraryText } from '@/lib/parse-itinerary'
 import { createTripFromOnboarding } from '@/app/actions/onboarding'
+import { bootstrapTrip } from '@/app/actions/trip'
 import type { DraftContact, DraftDay, ParsedDay, ProposedItem } from '@/lib/import-types'
 import DayReview from './day-review'
 import PackingReview from './packing-review'
@@ -32,12 +33,14 @@ const field = 'w-full bg-surface-2 border border-border rounded-xl px-3 py-2.5 t
  * Nothing is written until the last step. A flow abandoned halfway leaves no
  * half-built trip behind.
  */
-export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boolean; isFirstTrip: boolean }) {
+export default function NewTripFlow({
+  aiEnabled, isFirstTrip, initialName = '',
+}: { aiEnabled: boolean; isFirstTrip: boolean; initialName?: string }) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [stage, setStage] = useState<Stage>('choose')
-  const [tripName, setTripName] = useState('')
+  const [tripName, setTripName] = useState(initialName)
   const [days, setDays] = useState<ParsedDay[]>([])
   const [gaps, setGaps] = useState<string[]>([])
   const [accepted, setAccepted] = useState<Record<number, boolean>>({})
@@ -265,6 +268,20 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
     }
   }
 
+  /** Copies the seeded template — the pre-onboarding default, now opt-in. */
+  function useExample() {
+    setError(null)
+    startTransition(async () => {
+      try {
+        await bootstrapTrip(tripName.trim() || undefined)
+        router.push('/app')
+        router.refresh()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not set up the example trip.')
+      }
+    })
+  }
+
   /* ── Save ───────────────────────────────────────────────────────────────── */
 
   function save() {
@@ -344,6 +361,17 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
               title="Build it myself"
               body="Name the trip, add days as you know them, and carry on inside the app."
               onClick={() => { setStage('manual'); setError(null) }}
+            />
+            {/* What every new account used to get without being asked. Keeping it
+                as a choice is how the sample data stays useful — for trying the
+                app out, and for the demo behind the write-up — without being
+                imposed on someone going somewhere else entirely. */}
+            <Choice
+              icon={<Compass size={18} aria-hidden="true" />}
+              title="Start from the example trip"
+              body="A real nine-day Spiti Valley itinerary with its full packing list, to look around before making your own."
+              onClick={useExample}
+              disabled={pending}
             />
           </div>
 
@@ -492,11 +520,12 @@ export default function NewTripFlow({ aiEnabled, isFirstTrip }: { aiEnabled: boo
   )
 }
 
-function Choice({ icon, title, body, onClick }: { icon: React.ReactNode; title: string; body: string; onClick: () => void }) {
+function Choice({ icon, title, body, onClick, disabled }: { icon: React.ReactNode; title: string; body: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
-      className="text-left bg-surface border border-border rounded-2xl p-4 hover:border-accent/40 transition-colors flex gap-3"
+      disabled={disabled}
+      className="text-left bg-surface border border-border rounded-2xl p-4 hover:border-accent/40 transition-colors flex gap-3 disabled:opacity-50"
     >
       <span className="text-accent shrink-0 mt-0.5">{icon}</span>
       <span className="min-w-0">

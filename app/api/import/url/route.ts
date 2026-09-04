@@ -1,4 +1,5 @@
-import { getTripContext } from '@/lib/trip'
+import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
 import { safeFetchPage, UnsafeUrlError } from '@/lib/safe-fetch'
 import { htmlToText, htmlTitle } from '@/lib/html-text'
 
@@ -16,11 +17,15 @@ export const maxDuration = 30
  * /api/ai/import-itinerary itself. Two small routes, one trust boundary each.
  */
 export async function POST(req: Request) {
-  try {
-    await getTripContext()
-  } catch {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // A session, not a trip. This runs during onboarding, which is where someone
+  // goes precisely because they have no trip yet — gating on one would 401 the
+  // only users who need it.
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const limited = rateLimit(user.id, 'import-url', { perMinute: 6, burst: 3 })
+  if (limited) return limited
 
   let url: unknown
   try {

@@ -8,6 +8,7 @@ import ByokSection from './byok-section'
 import AdminPanel from './admin-panel'
 import PartnersSection from './partners-section'
 import ContactsSection from './contacts-section'
+import DangerZone from './danger-zone'
 import type { AppRole, Database, MemberKey } from '@/lib/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -257,6 +258,7 @@ export default function SettingsScreen({ profile, userEmail, memberKey, appRole 
       <ByokSection isAdmin={appRole === 'admin'} />
       {appRole === 'admin' && <AdminPanel />}
       <PreferencesSection />
+      <DangerZone email={userEmail} />
       <section>
         <button
           onClick={handleSignOut}

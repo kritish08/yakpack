@@ -102,7 +102,7 @@ export default function TripSwitcher({ trips, currentName }: { trips: TripSummar
                 route. A name-only shortcut here would skip all of that and
                 produce an empty trip. */}
             <Link
-              href="/app/trips/new"
+              href="/onboarding"
               onClick={() => setOpen(false)}
               className="w-full flex items-center gap-2 px-1.5 py-2 font-mono text-xs text-text-muted hover:text-accent transition-colors min-h-[40px]"
             >

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Settings } from 'lucide-react'
 import { AI_ENABLED } from '@/lib/ai'
-import { ensureTripContext, listTrips } from '@/lib/trip'
+import { requireTripContext, listTrips } from '@/lib/trip'
 import TripSwitcher from '@/components/app/trip-switcher'
 import ThemeToggle from '@/components/theme-toggle'
 import PageTransition from '@/components/page-transition'
@@ -12,7 +12,7 @@ import BottomNav from '@/components/bottom-nav'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // A user can arrive authenticated but trip-less when signup and email
   // confirmation are separated. Fill that gap here rather than dead-ending them.
-  const ctx = await ensureTripContext()
+  const ctx = await requireTripContext()
   const trips = await listTrips()
 
   return (

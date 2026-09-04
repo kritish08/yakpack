@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { Eye, EyeOff, Check, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { safeNext } from '@/lib/safe-next'
-import { bootstrapTrip } from '@/app/actions/trip'
 import { DEFAULT_MODEL, listModels, setKey } from '@/lib/byok'
 
 const input =
@@ -89,15 +88,11 @@ function RegisterPageForm() {
       return
     }
 
-    try {
-      await bootstrapTrip(tripName)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not set up your trip.')
-      setLoading(false)
-      return
-    }
-
-    router.push(destination)
+    // Deliberately no trip here. Copying the seeded template on signup meant
+    // every new account opened on somebody else's nine-day Himalayan road trip,
+    // and made the onboarding flow unreachable by giving the user a trip before
+    // they were ever asked how they wanted to start. Onboarding creates it.
+    router.push(tripName.trim() ? `/onboarding?name=${encodeURIComponent(tripName.trim())}` : '/onboarding')
     router.refresh()
   }
 

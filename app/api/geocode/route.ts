@@ -1,4 +1,5 @@
-import { getTripContext } from '@/lib/trip'
+import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
 import { geocodeCandidates, resolveRoute } from '@/lib/geocode'
 import { sanitizeText } from '@/lib/sanitize'
 
@@ -24,11 +25,15 @@ export const maxDuration = 30
  * the UI says how far off-route it is. Nothing is applied without a tap.
  */
 export async function POST(req: Request) {
-  try {
-    await getTripContext()
-  } catch {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // A session, not a trip. This runs during onboarding, which is where someone
+  // goes precisely because they have no trip yet — gating on one would 401 the
+  // only users who need it.
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const limited = rateLimit(user.id, 'geocode', { perMinute: 20, burst: 10 })
+  if (limited) return limited
 
   let places: unknown
   try {

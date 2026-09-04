@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Database, MemberKey, TripContact, TripMemberView, TripSummary } from '@/lib/database.types'
 
@@ -121,29 +122,27 @@ export function memberLabel(
 }
 
 /**
- * Returns the caller's trip context, creating their trip first if registration
- * never got that far.
+ * The caller's trip context, or a trip to onboarding.
  *
- * Signup and trip creation are two steps, and they can be separated by an email
- * confirmation — so a user can legitimately arrive authenticated with no trip.
- * Rather than dead-ending them, the app layout calls this and the RPC fills the
- * gap. It is idempotent: a user who already owns a trip gets it back unchanged.
+ * Replaces an earlier ensureTripContext() that silently created a trip from the
+ * seeded template. That was the wrong default: it meant every new account of a
+ * general travel companion opened on somebody else's nine-day Himalayan road
+ * trip, and the onboarding flow that asks how you want to start was unreachable
+ * because a trip already existed by the time you arrived.
+ *
+ * Copying the template is still available — it is now one of the choices on the
+ * onboarding screen rather than a decision made on the user's behalf.
+ *
+ * Safe to call from a layout and its page concurrently: redirecting twice to the
+ * same place is the same as redirecting once.
  */
-export async function ensureTripContext(): Promise<TripContext> {
+export async function requireTripContext(): Promise<TripContext> {
   try {
     return await getTripContext()
   } catch (err) {
-    if ((err as Error).message !== 'NO_TRIP') throw err
+    if ((err as Error).message === 'NO_TRIP') redirect('/onboarding')
+    throw err
   }
-
-  const supabase = await createClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).rpc('create_trip_from_template', { p_trip_name: null })
-  if (error) throw new Error(error.message)
-
-  // Read fresh: the memoized query still holds the empty result that sent us
-  // here, and reusing it would report NO_TRIP for a trip we just created.
-  return getTripContext(true)
 }
 
 /**

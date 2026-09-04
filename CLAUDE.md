@@ -210,10 +210,25 @@ The rule for copying: **the packing list copies from the template in both creati
 paths; route data — itinerary and contacts — copies only in the signup bootstrap.**
 A trip you create yourself starts with your own days and your own numbers.
 
-**Registration** calls `create_trip_from_template()`, which copies the template trip's
-categories, items, packed rows and itinerary atomically. It is idempotent — a retried
-signup returns the existing trip. `app/app/layout.tsx` calls `ensureTripContext()` as a
-safety net, because email confirmation can separate signup from the first session.
+**Registration creates no trip.** It creates the account and sends the user to
+`/onboarding`, which asks how they want to start: a PDF, a link, by hand, or a copy of
+the seeded example. Copying the template used to happen automatically at signup, which
+meant every new account of a general travel companion opened on somebody else's nine-day
+Spiti trip — and made onboarding unreachable, because a trip already existed by the time
+the user arrived. `create_trip_from_template()` still exists and is still idempotent; it
+is now one of the four choices rather than a decision made for the user.
+
+Anything that needs a trip calls `requireTripContext()`, which redirects to `/onboarding`
+when there is none. Both the layout and its page call it, because they render
+concurrently — redirecting twice to the same place is the same as redirecting once.
+
+⚠️ An action that creates a trip **must** `revalidatePath('/app', 'layout')`. Before the
+trip existed `/app` answered with a redirect to `/onboarding`, and the client router
+cached that answer; without revalidation the user is bounced back to onboarding for ever,
+because every attempt re-reads the same cache entry.
+
+`/onboarding` lives outside `app/app/` deliberately — that layout resolves a trip for its
+header and tab bar, and this is the one screen reached precisely because there isn't one.
 
 ⚠️ The token default uses `gen_random_uuid()`, not `gen_random_bytes()` — the latter
 needs pgcrypto, which a self-hosted clone may not have enabled.
@@ -275,6 +290,24 @@ return the markup after — otherwise a render error is swallowed by a catch mea
 fetch, and `react-hooks/error-boundaries` will (correctly) fail the build.
 
 ---
+
+## Limits and account lifecycle
+
+`lib/rate-limit.ts` is a per-user token bucket in process memory, applied to the routes
+that reach the network on the caller's behalf: `/api/import/url` (6/min, burst 3 — it
+fetches a URL of the caller's choosing from the server, so it is the one that could
+otherwise be a general-purpose proxy), `/api/geocode` (20/min), and the two AI import
+routes (10/min). Per-instance on serverless, so it bounds a runaway loop rather than a
+distributed abuser; the replacement is Postgres or Upstash behind the same `check()`
+signature.
+
+`app/actions/account.ts` lets a user export their data and delete their own account. The
+delete uses the service role because removing an auth user requires it, but the id comes
+from the session and never from an argument — that is the whole safety argument, and it
+is why there is no `userId` parameter. Trips the caller organises are deleted with them
+(`trips.created_by` is ON DELETE SET NULL, so they would otherwise survive as ownerless
+rows nobody can reach); trips they were invited to are left alone, with only their
+membership and packed rows withdrawn.
 
 ## Feature Flags
 

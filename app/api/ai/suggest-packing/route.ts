@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { AI_ENABLED, modelForRequest, PEMBA_SYSTEM } from '@/lib/ai'
 import { isAdmin } from '@/lib/admin'
 import { getTripContext } from '@/lib/trip'
+import { rateLimit } from '@/lib/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
 import { baseList, factsFromDays, sortItems, CATEGORY_ORDER, type SeedItem } from '@/lib/packing-rules'
 
@@ -51,6 +52,9 @@ export async function POST(req: Request) {
 
   try {
     const ctx = await getTripContext()
+
+    const limited = rateLimit(ctx.userId, 'ai-packing', { perMinute: 10, burst: 4 })
+    if (limited) return limited
 
     const body = await req.json()
     const rawDays = Array.isArray(body?.days) ? body.days : []

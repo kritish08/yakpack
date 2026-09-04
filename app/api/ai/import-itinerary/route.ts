@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { AI_ENABLED, modelForRequest } from '@/lib/ai'
 import { isAdmin } from '@/lib/admin'
 import { getTripContext } from '@/lib/trip'
+import { rateLimit } from '@/lib/rate-limit'
 import { sanitizeText } from '@/lib/sanitize'
 import { geocodeCandidates, resolveRoute } from '@/lib/geocode'
 
@@ -51,7 +52,10 @@ export async function POST(req: Request) {
   if (!model) return Response.json({ error: 'NO_KEY' }, { status: 402 })
 
   try {
-    await getTripContext() // must be signed in and in a trip
+    const ctx = await getTripContext() // must be signed in and in a trip
+
+    const limited = rateLimit(ctx.userId, 'ai-import', { perMinute: 10, burst: 4 })
+    if (limited) return limited
 
     const { text } = await req.json()
     const source = typeof text === 'string' ? text.trim() : ''
