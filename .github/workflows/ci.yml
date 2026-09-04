@@ -49,9 +49,17 @@ jobs:
         with:
           version: latest
 
+      # --include-all is required, not a shortcut. Production applied the
+      # realtime-publication migration as 20260828172427, and multi_tenancy
+      # (140000) and trip_bootstrap (160000) sort before it, so the CLI refuses
+      # to insert them without explicit consent. That refusal is the right
+      # default — inserting migrations behind the high-water mark is how two
+      # databases silently diverge — but here those two genuinely have not run
+      # yet, and the resulting sequence was rehearsed against a copy of
+      # production's real data before this was enabled.
       - name: Push pending migrations
         run: |
           supabase link --project-ref uhocrvejirshtpclagzk
-          supabase db push --linked
+          supabase db push --linked --include-all
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
