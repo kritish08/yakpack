@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Check, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { safeNext } from '@/lib/safe-next'
+import { safeNext, DEFAULT_NEXT } from '@/lib/safe-next'
 import { DEFAULT_MODEL, listModels, setKey } from '@/lib/byok'
 
 const input =
@@ -92,7 +92,14 @@ function RegisterPageForm() {
     // every new account opened on somebody else's nine-day Himalayan road trip,
     // and made the onboarding flow unreachable by giving the user a trip before
     // they were ever asked how they wanted to start. Onboarding creates it.
-    router.push(tripName.trim() ? `/onboarding?name=${encodeURIComponent(tripName.trim())}` : '/onboarding')
+    // Onboarding first — a new account has no trip yet — but carry ?next=
+    // through it, so an invite link that sent someone here to sign up still
+    // lands them where they were going once the trip exists.
+    const params = new URLSearchParams()
+    if (tripName.trim()) params.set('name', tripName.trim())
+    if (destination !== DEFAULT_NEXT) params.set('next', destination)
+    const query = params.toString()
+    router.push(query ? `/onboarding?${query}` : '/onboarding')
     router.refresh()
   }
 

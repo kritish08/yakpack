@@ -35,8 +35,8 @@ const field = 'w-full bg-surface-2 border border-border rounded-xl px-3 py-2.5 t
  * half-built trip behind.
  */
 export default function NewTripFlow({
-  aiEnabled, isFirstTrip, initialName = '',
-}: { aiEnabled: boolean; isFirstTrip: boolean; initialName?: string }) {
+  aiEnabled, isFirstTrip, initialName = '', nextPath = '/app',
+}: { aiEnabled: boolean; isFirstTrip: boolean; initialName?: string; nextPath?: string }) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -280,7 +280,7 @@ export default function NewTripFlow({
     startTransition(async () => {
       try {
         await bootstrapTrip(tripName.trim() || undefined)
-        router.push('/app')
+        router.push(nextPath)
         router.refresh()
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not set up the example trip.')
@@ -310,7 +310,7 @@ export default function NewTripFlow({
           })),
           contacts: contacts.map(c => ({ role: c.role, name: c.name, phone: c.phone })),
         })
-        router.push('/app')
+        router.push(nextPath)
         router.refresh()
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not create the trip.')

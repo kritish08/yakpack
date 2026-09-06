@@ -40,6 +40,7 @@ Dark-mode first, with a fully-specified warm light mode. Everything via CSS-vari
 | `--accent-2` | `#4a9e7e` | Success / packed green |
 | `--accent-3` | `#9e4a4a` | Warning / to-buy red |
 | `--accent-4` | `#4a6e9e` | Info / cold / shared blue |
+| `--accent-5` | `#7e4a9e` | Fourth person (partner 3) violet |
 | `--accent-dim` | `rgba(212,148,58,0.10)` | Accent tint |
 
 ### Light mode (warm paper)
@@ -58,6 +59,7 @@ Dark-mode first, with a fully-specified warm light mode. Everything via CSS-vari
 | `--accent-2` | `#4a7d6e` | Success |
 | `--accent-3` | `#7d4a4a` | Warning |
 | `--accent-4` | `#4a6e9e` | Cold/info |
+| `--accent-5` | `#6e4a7d` | Fourth person |
 | `--accent-dim` | `rgba(176,125,74,0.08)` | Tint |
 
 **Weather-reactive accents:** cold (<5°C) → blue glow on temp; high UV (≥6) → amber UV badge; rain likely →
