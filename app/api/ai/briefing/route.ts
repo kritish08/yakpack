@@ -2,6 +2,7 @@ import { generateText } from 'ai'
 import { unstable_cache } from 'next/cache'
 import { AI_ENABLED, modelForRequest, PEMBA_SYSTEM } from '@/lib/ai'
 import { isAdmin } from '@/lib/admin'
+import { localToday } from '@/lib/local-date'
 import { createClient } from '@/lib/supabase/server'
 import { getTripContext } from '@/lib/trip'
 import type { Database } from '@/lib/database.types'
@@ -49,7 +50,7 @@ export async function GET(req: Request) {
   try {
     const supabase = await createClient()
     const { tripId } = await getTripContext()
-    const today = new Date().toISOString().slice(0, 10)
+    const today = await localToday()
 
     const { data: rawLeg } = await supabase
       .from('itinerary')

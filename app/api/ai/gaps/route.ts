@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache'
 import { z } from 'zod'
 import { AI_ENABLED, modelForRequest, PEMBA_SYSTEM } from '@/lib/ai'
 import { isAdmin } from '@/lib/admin'
+import { localToday } from '@/lib/local-date'
 import { createClient } from '@/lib/supabase/server'
 import { getTripContext } from '@/lib/trip'
 import type { Database } from '@/lib/database.types'
@@ -72,7 +73,7 @@ export async function GET(req: Request) {
     const highAlt  = itinerary?.filter(l => (l.altitude_m ?? 0) > 4000).map(l => `Day ${l.day}`) ?? []
     const offline  = itinerary?.filter(l => l.network === 'none').map(l => `Day ${l.day}`) ?? []
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = await localToday()
     const { gaps } = await generateGapsCached(
       tripId, today, unpacked, toBuy, highAlt, offline, model,
     )

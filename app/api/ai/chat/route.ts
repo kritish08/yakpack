@@ -2,6 +2,7 @@ import { streamText, tool, stepCountIs, convertToModelMessages } from 'ai'
 import { z } from 'zod'
 import { AI_ENABLED, modelForRequest, PEMBA_SYSTEM } from '@/lib/ai'
 import { isAdmin } from '@/lib/admin'
+import { localToday } from '@/lib/local-date'
 import { createClient } from '@/lib/supabase/server'
 import { getTripContext } from '@/lib/trip'
 import type { Database } from '@/lib/database.types'
@@ -30,6 +31,13 @@ export async function POST(req: Request) {
   // but scoping the query keeps a multi-trip user's answers correct rather than
   // merely safe — otherwise Pemba could mix two trips' packing lists together.
   const { tripId } = await getTripContext()
+
+  // Resolved once per request, not inside the tool below: the tool runs while
+  // the response streams, and every tool call in one turn must agree on what
+  // day it is. localToday() reads the traveller's own zone from a cookie —
+  // toISOString() is UTC, which showed a traveller at UTC+5:30 yesterday's leg
+  // until half past five each morning.
+  const today = await localToday()
 
   const { messages } = await req.json()
 
@@ -72,7 +80,6 @@ export async function POST(req: Request) {
         description: "Get today's itinerary leg based on the current date.",
         inputSchema: z.object({}),
         execute: async () => {
-          const today = new Date().toISOString().slice(0, 10)
           const { data } = await supabase
             .from('itinerary')
             .select('*')
