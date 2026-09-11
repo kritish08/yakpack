@@ -1,6 +1,8 @@
 import 'server-only'
 import dns from 'node:dns/promises'
 import net from 'node:net'
+import https from 'node:https'
+import type { IncomingMessage } from 'node:http'
 
 /**
  * Fetching a URL the user typed is a server-side request to an attacker-chosen
@@ -22,12 +24,14 @@ import net from 'node:net'
  *   4. The body is capped and the whole thing is on a timeout, so a slow or
  *      endless response cannot hold a server function open.
  *
- * Residual risk, stated rather than hidden: between our DNS lookup and fetch's
- * own, a hostile resolver could return a private address (DNS rebinding).
- * Closing that needs a custom dispatcher that pins the validated IP, which
- * breaks TLS SNI unless carefully hand-rolled. The window is small, the
- * response is only ever parsed as text and shown back to the user for review,
- * and nothing is written from it without confirmation.
+ *   5. The connection is pinned to the addresses that were checked. Validating
+ *      a hostname and then handing it to `fetch` resolves it twice, and a
+ *      hostile resolver can answer publicly for the check and privately for the
+ *      connection -- DNS rebinding, a time-of-check/time-of-use bug that no
+ *      amount of address-rule work fixes. That is why this uses node:https with
+ *      a custom `lookup` rather than fetch: there is no second resolution to
+ *      poison. SNI and certificate validation still use the hostname, so
+ *      pinning the address does not weaken TLS.
  */
 
 export const MAX_BYTES = 2 * 1024 * 1024
@@ -130,7 +134,13 @@ export class UnsafeUrlError extends Error {}
  * error turns this endpoint into a port scanner that reports what is listening
  * on the private network.
  */
-async function assertSafe(raw: string): Promise<URL> {
+interface SafeTarget {
+  url: URL
+  /** The addresses this host was validated at, and the only ones we will use. */
+  addresses: string[]
+}
+
+async function assertSafe(raw: string): Promise<SafeTarget> {
   let url: URL
   try {
     url = new URL(raw)
@@ -153,7 +163,7 @@ async function assertSafe(raw: string): Promise<URL> {
   // A literal IP never needs resolving, and must not be trusted to.
   if (net.isIP(host)) {
     if (isBlockedAddress(host)) throw new UnsafeUrlError('That address cannot be reached.')
-    return url
+    return { url, addresses: [host] }
   }
 
   let records: { address: string }[]
@@ -168,7 +178,71 @@ async function assertSafe(raw: string): Promise<URL> {
     throw new UnsafeUrlError('That address cannot be reached.')
   }
 
-  return url
+  return { url, addresses: records.map(r => r.address) }
+}
+
+/**
+ * A DNS lookup that answers only with addresses this module already checked.
+ *
+ * This is the whole anti-rebinding mechanism. Node calls it instead of resolving
+ * the name again, so the socket can only be opened to an address that passed
+ * isBlockedAddress() moments ago. It never consults a resolver, so there is
+ * nothing for a short TTL to change underneath us.
+ *
+ * Exported for tests: "the socket can only go where we already checked" is the
+ * whole claim, and it should be assertable without standing up a hostile
+ * resolver.
+ */
+export function pinnedLookup(addresses: string[]) {
+  const entries = addresses.map(a => ({ address: a, family: net.isIP(a) }))
+
+  return (
+    _hostname: string,
+    options: { all?: boolean; family?: number },
+    callback: (err: NodeJS.ErrnoException | null, address?: unknown, family?: number) => void,
+  ): void => {
+    const wanted = options.family
+      ? entries.filter(e => e.family === options.family)
+      : entries
+
+    if (wanted.length === 0) {
+      callback(Object.assign(new Error('no validated address'), { code: 'ENOTFOUND' }))
+      return
+    }
+    if (options.all) callback(null, wanted)
+    else callback(null, wanted[0].address, wanted[0].family)
+  }
+}
+
+/** One GET to an already-validated target. Redirects are not followed here. */
+function requestOnce(target: SafeTarget, signal: AbortSignal): Promise<IncomingMessage> {
+  const host = target.url.hostname.replace(/^\[|\]$/g, '')
+
+  return new Promise<IncomingMessage>((resolve, reject) => {
+    const req = https.request(
+      target.url,
+      {
+        method: 'GET',
+        signal,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        lookup: pinnedLookup(target.addresses) as any,
+        // SNI stays the hostname so the certificate is still checked against the
+        // name the user typed. A literal IP gets none, which is what TLS expects.
+        servername: net.isIP(host) ? undefined : host,
+        headers: {
+          // Identify honestly. Some sites serve a different page to unknown
+          // agents, but pretending to be a browser to get around that is not
+          // this feature's business.
+          'User-Agent': 'YakPack/1.0 (+https://yakpack.tech; itinerary import)',
+          Accept: 'text/html,text/plain;q=0.9',
+          'Accept-Language': 'en',
+        },
+      },
+      resolve,
+    )
+    req.on('error', reject)
+    req.end()
+  })
 }
 
 export interface FetchedPage {
@@ -189,35 +263,30 @@ export async function safeFetchPage(raw: string): Promise<FetchedPage> {
     let target = await assertSafe(raw)
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const res = await fetch(target, {
-        redirect: 'manual',
-        signal: controller.signal,
-        headers: {
-          // Identify honestly. Some sites serve a different page to unknown
-          // agents, but pretending to be a browser to get around that is not
-          // this feature's business.
-          'User-Agent': 'YakPack/1.0 (+https://yakpack.tech; itinerary import)',
-          Accept: 'text/html,text/plain;q=0.9',
-          'Accept-Language': 'en',
-        },
-      })
+      const res = await requestOnce(target, controller.signal)
+      const status = res.statusCode ?? 0
 
-      if (res.status >= 300 && res.status < 400) {
-        const location = res.headers.get('location')
+      if (status >= 300 && status < 400) {
+        const location = res.headers.location
+        res.destroy()
         if (!location) throw new UnsafeUrlError('That page redirected nowhere.')
         if (hop === MAX_REDIRECTS) throw new UnsafeUrlError('That page redirected too many times.')
         // Resolved against the current URL, then re-validated from scratch —
         // this is the hop that would otherwise land inside the private network.
-        target = await assertSafe(new URL(location, target).toString())
+        // Re-validating also re-pins: the next hop connects only to addresses
+        // checked for *its* hostname.
+        target = await assertSafe(new URL(location, target.url).toString())
         continue
       }
 
-      if (!res.ok) {
-        throw new UnsafeUrlError(`That page returned ${res.status}.`)
+      if (status < 200 || status > 299) {
+        res.destroy()
+        throw new UnsafeUrlError(`That page returned ${status}.`)
       }
 
-      const contentType = (res.headers.get('content-type') ?? '').toLowerCase()
+      const contentType = (res.headers['content-type'] ?? '').toLowerCase()
       if (!/text\/html|text\/plain|application\/xhtml/.test(contentType)) {
+        res.destroy()
         throw new UnsafeUrlError(
           contentType.includes('pdf')
             ? 'That link is a PDF — download it and use the PDF option instead.'
@@ -226,17 +295,21 @@ export async function safeFetchPage(raw: string): Promise<FetchedPage> {
       }
 
       // Declared length is a hint, not a promise, so the stream is capped too.
-      const declared = Number(res.headers.get('content-length') ?? 0)
-      if (declared > MAX_BYTES) throw new UnsafeUrlError('That page is too large to read.')
+      const declared = Number(res.headers['content-length'] ?? 0)
+      if (declared > MAX_BYTES) {
+        res.destroy()
+        throw new UnsafeUrlError('That page is too large to read.')
+      }
 
       const { text, truncated } = await readCapped(res)
-      return { url: target.toString(), contentType, body: text, truncated }
+      return { url: target.url.toString(), contentType, body: text, truncated }
     }
 
     throw new UnsafeUrlError('That page redirected too many times.')
   } catch (e) {
     if (e instanceof UnsafeUrlError) throw e
-    if (e instanceof Error && e.name === 'AbortError') {
+    const err = e as NodeJS.ErrnoException
+    if (err?.name === 'AbortError' || err?.code === 'ABORT_ERR') {
       throw new UnsafeUrlError('That page took too long to respond.')
     }
     throw new UnsafeUrlError('That page could not be read.')
@@ -246,30 +319,22 @@ export async function safeFetchPage(raw: string): Promise<FetchedPage> {
 }
 
 /** Reads at most MAX_BYTES, then stops pulling rather than buffering the rest. */
-async function readCapped(res: Response): Promise<{ text: string; truncated: boolean }> {
-  const reader = res.body?.getReader()
-  if (!reader) return { text: '', truncated: false }
-
-  const chunks: Uint8Array[] = []
+async function readCapped(res: IncomingMessage): Promise<{ text: string; truncated: boolean }> {
+  const chunks: Buffer[] = []
   let total = 0
   let truncated = false
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (!value) continue
-    total += value.byteLength
+  for await (const chunk of res) {
+    const buf = chunk as Buffer
+    total += buf.length
     if (total > MAX_BYTES) {
-      chunks.push(value.slice(0, value.byteLength - (total - MAX_BYTES)))
+      chunks.push(buf.subarray(0, buf.length - (total - MAX_BYTES)))
       truncated = true
-      await reader.cancel()
+      res.destroy()
       break
     }
-    chunks.push(value)
+    chunks.push(buf)
   }
 
-  const buf = new Uint8Array(total > MAX_BYTES ? MAX_BYTES : total)
-  let at = 0
-  for (const c of chunks) { buf.set(c, at); at += c.byteLength }
-  return { text: new TextDecoder('utf-8', { fatal: false }).decode(buf), truncated }
+  return { text: Buffer.concat(chunks).toString('utf8'), truncated }
 }

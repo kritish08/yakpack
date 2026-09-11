@@ -151,8 +151,20 @@ export function enqueueOp(op: Op): void {
   writeQueue(queue)
 }
 
+/**
+ * Drops every queued op, both keys.
+ *
+ * The legacy key is removed explicitly rather than left to be drained on the
+ * next read: this is also the sign-out path, and "drained on read" would mean
+ * the previous user's un-replayed check-offs survive until somebody reads the
+ * queue again.
+ */
 export function clearQueue(): void {
   writeQueue([])
+  if (!hasStorage()) return
+  try {
+    window.localStorage.removeItem(LEGACY_KEY)
+  } catch { /* ignore */ }
 }
 
 type Client = SupabaseClient<Database>

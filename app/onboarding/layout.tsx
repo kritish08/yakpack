@@ -9,7 +9,9 @@ export const metadata = { title: 'New trip — YakPack' }
  * one screen a user reaches precisely because they do not have one yet. Nesting
  * it there would mean the layout redirecting to the page that lives inside it.
  *
- * Still behind the auth proxy — /onboarding is not in PUBLIC_PATHS.
+ * Auth-gated: /onboarding is listed in PROTECTED_PREFIXES in proxy.ts. Being
+ * absent from PUBLIC_PATHS is not what gates a route — unlisted paths fall
+ * through untouched, which is how this screen was reachable signed out.
  */
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (

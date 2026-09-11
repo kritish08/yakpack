@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil, X, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { wipeLocalData } from '@/lib/local-wipe'
 import ByokSection from './byok-section'
 import AdminPanel from './admin-panel'
 import PartnersSection from './partners-section'
@@ -244,6 +245,10 @@ export default function SettingsScreen({ profile, userEmail, memberKey, appRole 
   const router = useRouter()
 
   async function handleSignOut() {
+    // Before the session goes, not after: once signed out the page may navigate
+    // away mid-purge and leave the previous user's cached rows and pages on the
+    // device. See lib/local-wipe.ts for what is removed and what is kept.
+    await wipeLocalData()
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')

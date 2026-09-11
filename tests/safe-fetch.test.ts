@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isBlockedAddress, safeFetchPage, UnsafeUrlError } from '@/lib/safe-fetch'
+import { isBlockedAddress, pinnedLookup, safeFetchPage, UnsafeUrlError } from '@/lib/safe-fetch'
 
 /**
  * /api/import/url makes a server-side request to an address the caller chooses.
@@ -111,5 +111,58 @@ describe('URL shape', () => {
     // A precise error turns this endpoint into a port scanner that reports what
     // is listening on the private network.
     await expect(safeFetchPage('https://10.0.0.5/')).rejects.toThrow(/^That address cannot be reached\.$/)
+  })
+})
+
+/**
+ * The anti-rebinding guarantee.
+ *
+ * Validating a hostname and then handing it to fetch() resolves it twice, and a
+ * hostile resolver can answer publicly for the check and privately for the
+ * connection. pinnedLookup is what removes the second resolution: it must answer
+ * only with addresses that were already checked, and never reach a resolver.
+ */
+describe('pinned lookup', () => {
+  const call = (addresses: string[], options: { all?: boolean; family?: number }) =>
+    new Promise<{ err: NodeJS.ErrnoException | null; address?: unknown; family?: number }>(resolve => {
+      pinnedLookup(addresses)('anything.example', options, (err, address, family) =>
+        resolve({ err, address, family }),
+      )
+    })
+
+  it('answers with the validated address, whatever hostname it is asked for', async () => {
+    const { err, address, family } = await call(['93.184.216.34'], {})
+    expect(err).toBeNull()
+    expect(address).toBe('93.184.216.34')
+    expect(family).toBe(4)
+  })
+
+  it('returns every validated address when Node asks for all of them', async () => {
+    const { err, address } = await call(['185.199.108.133', '185.199.109.133'], { all: true })
+    expect(err).toBeNull()
+    expect(address).toEqual([
+      { address: '185.199.108.133', family: 4 },
+      { address: '185.199.109.133', family: 4 },
+    ])
+  })
+
+  it('filters to the family Node asked for', async () => {
+    const mixed = ['185.199.108.133', '2606:50c0:8000::153']
+    const v6 = await call(mixed, { all: true, family: 6 })
+    expect(v6.address).toEqual([{ address: '2606:50c0:8000::153', family: 6 }])
+
+    const v4 = await call(mixed, { all: true, family: 4 })
+    expect(v4.address).toEqual([{ address: '185.199.108.133', family: 4 }])
+  })
+
+  it('fails rather than falling back when no validated address fits', async () => {
+    const { err } = await call(['185.199.108.133'], { family: 6 })
+    expect(err).toBeTruthy()
+    expect(err?.code).toBe('ENOTFOUND')
+  })
+
+  it('never invents an address that was not validated', async () => {
+    const { address } = await call(['1.1.1.1'], { all: true })
+    expect(address).toEqual([{ address: '1.1.1.1', family: 4 }])
   })
 })

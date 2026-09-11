@@ -11,7 +11,7 @@ const AUTH_PAGES = ['/login', '/register', '/reset-password']
 
 // Everything that requires a session. Anything not listed here and not public
 // falls through untouched (static assets, the auth callback, the manifest).
-const PROTECTED_PREFIXES = ['/app', '/invite', '/api/ai', '/api/weather']
+const PROTECTED_PREFIXES = ['/app', '/onboarding', '/invite', '/api/ai', '/api/weather']
 
 function matches(pathname: string, prefixes: string[]) {
   return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'))

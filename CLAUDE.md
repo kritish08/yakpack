@@ -64,7 +64,15 @@ still calls `context.getFilename()`, which ESLint 10 removed.
 ```
 
 - **Auth**: `proxy.ts` (Next 16's rename of `middleware.ts` — do not recreate
-  `middleware.ts`) gates everything except `/login`, `/reset-password`, `/api/auth`.
+  `middleware.ts`) gates the prefixes in `PROTECTED_PREFIXES`: `/app`, `/onboarding`,
+  `/invite`, `/api/ai`, `/api/weather`.
+  ⚠️ It is an **allowlist, not a blocklist**. A path that is in neither
+  `PUBLIC_PATHS` nor `PROTECTED_PREFIXES` falls through *unauthenticated* — absence
+  from `PUBLIC_PATHS` gates nothing. `/onboarding` was reachable signed out for
+  exactly this reason, behind a comment claiming the opposite. A new authed route
+  must be added to `PROTECTED_PREFIXES`; the routes that check `getUser()` themselves
+  (`/api/import/url`, `/api/geocode`) do so because onboarding callers have no trip
+  yet, and that check is what actually protects them.
 - **Reads**: one `getXData()` per screen in `lib/` (`today`, `pack`, `tobuy`, `plan`),
   each parallel-fetching under RLS with the cookie-bound client.
 - **Writes**: server actions in `app/actions/`, each re-checking `getUser()` and
@@ -202,10 +210,20 @@ its item, and writes are additionally pinned to the caller's own `member_key` or
 This is verified, not assumed: an authenticated user holding another trip's real UUID
 cannot read its rows, insert into it, or add themselves to it as a member.
 
-**Partner invites.** `create_trip_invite()` allocates the first free slot
-(`partner_1` then `partner_2`), where "free" means held by neither a member nor a
-live invite — that is what caps a trip at three partners. It returns a 256-bit token;
+**Partner invites.** `create_trip_invite(p_trip_id, p_email)` allocates the first
+free slot (`partner_1`, then `partner_2`, then `partner_3`), where "free" means held
+by neither a member nor a live invite — that is what caps a trip at three partners.
+It returns a token built from two `gen_random_uuid()` calls (64 hex characters);
 there is no mail provider wired in, so the organiser shares the link themselves.
+
+⚠️ The trip is a **parameter**, and must stay one. It used to be inferred — the
+function took the caller's first organiser membership with `limit 1` — which was
+right only while an account could organise exactly one trip. Once it could organise
+several, the panel read the *active* trip (`profiles.current_trip_id`) while the
+invite went into an arbitrary one, and `revokeInvite()` (trip-scoped) could not
+cancel it. `app/actions/invites.ts` resolves the id from the session and never from
+an argument; the function is SECURITY DEFINER, so its own organiser-of-*this*-trip
+check is the only thing between a crafted id and someone else's trip.
 
 `accept_trip_invite()` is SECURITY DEFINER because the invitee is by definition not
 yet a member and cannot read the invite under RLS, so every check the policies would

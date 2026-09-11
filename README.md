@@ -9,7 +9,7 @@ Weather-aware packing · a shared list for up to four people · an AI guide you 
 [![CI](https://github.com/kritish08/yakpack/actions/workflows/ci.yml/badge.svg)](https://github.com/kritish08/yakpack/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
-[![Tests](https://img.shields.io/badge/tests-167%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-172%20passing-brightgreen)](#testing)
 
 [yakpack.tech](https://yakpack.tech) · [Terms](https://yakpack.tech/terms) · [Privacy](https://yakpack.tech/privacy)
 
@@ -182,7 +182,7 @@ Two details around the queue matter more than the queue itself:
 
 **What it cost.** Convergence. State that never rolls back can stay wrong indefinitely, and this implementation has not paid that bill — see [What's imperfect](#whats-imperfect).
 
-Code: [`lib/offline-queue.ts:166`](lib/offline-queue.ts#L166).
+Code: [`lib/offline-queue.ts:178`](lib/offline-queue.ts#L178).
 
 ---
 
@@ -319,7 +319,7 @@ Code: [`lib/ai.ts:33`](lib/ai.ts#L33).
 │   ├── safe-fetch safe-next sanitize  guards
 │   └── offline-queue local-date       offline and timezone
 ├── supabase/migrations/        16 migrations, 1,505 lines of SQL
-├── tests/                      10 test files + fixtures, 167 tests
+├── tests/                      10 test files + fixtures, 172 tests
 ├── public/sw.js                213 lines, hand-written
 ├── docs/                       the original build spec and audits
 ├── proxy.ts                    auth gate (Next 16's rename of middleware.ts)
@@ -356,7 +356,7 @@ Three places the order or the command matters:
 
 | Command | Does |
 |---|---|
-| `pnpm test` | 167 tests, 10 files, no network, ~300 ms |
+| `pnpm test` | 172 tests, 10 files, no network, ~300 ms |
 | `pnpm lint` | ESLint — 0 errors, 16 warnings |
 | `pnpm type-check` | `tsc --noEmit` |
 | `pnpm build` | Production build |
@@ -412,14 +412,14 @@ A person is simultaneously the organiser of their own trip and an ordinary user 
 ## Testing
 
 ```bash
-pnpm test        # 167 tests · 10 files · 0 network calls · ~300 ms
+pnpm test        # 172 tests · 10 files · 0 network calls · ~300 ms
 ```
 
 Deliberately all pure logic and no network. A test that also needs a third-party API to be up fails on a train, for reasons unrelated to the code. Fixtures in `tests/fixtures/` are real API responses captured once.
 
 | File | What it pins down |
 |---|---|
-| `safe-fetch` | Every SSRF address rule, including the IPv6 forms that carry an IPv4 address — `::ffff:a9fe:a9fe` is what a URL turns cloud metadata into, and matching only the dotted spelling let it through once |
+| `safe-fetch` | Every SSRF address rule, including the IPv6 forms that carry an IPv4 address — `::ffff:a9fe:a9fe` is what a URL turns cloud metadata into, and matching only the dotted spelling let it through once. Also the pinned lookup: the connection may only go to an address that was already checked |
 | `geocode-route` | Route-aware place resolution against real captured responses. Tabo must land in Himachal, not Ivory Coast |
 | `parse-itinerary` | The keyless importer, including that the altitude which matters is where you *sleep*, not the pass you crossed |
 | `offline-queue` | The outbox, including draining the superseded storage key and retaining an op whose replay failed |
@@ -438,17 +438,15 @@ Stated because they are the first things a reviewer would find anyway.
 
 **Known defects**
 
-- **Invites can target the wrong trip.** `create_trip_invite()` selects the caller's organised trip with `limit 1` and no ordering, and takes no trip argument ([`supabase/migrations/20260904120000_third_partner.sql:43`](supabase/migrations/20260904120000_third_partner.sql#L43)). Everything else is scoped to the *active* trip, which honours `profiles.current_trip_id` ([`lib/trip.ts:57`](lib/trip.ts#L57)). For an account organising one trip these are the same row; for two they need not be.
-- **Signing out leaves cached data on the device.** It calls `signOut()` and navigates ([`components/settings/settings-screen.tsx:246`](components/settings/settings-screen.tsx#L246)); it does not purge the service worker's caches or the outbox. On a shared device a later user who goes offline can be served the previous user's pages. Cross-account *writes* fail closed at the database, so this is disclosure at rest rather than corruption.
 - **A failed replay is retried forever.** `flushQueue()` pushes a failed op back onto the queue with no attempt counter, age limit, or dead-letter path. The two branches are also inconsistent: a `status` op filtered out by RLS matches zero rows, reports no error, and is silently discarded, while a refused `packed` upsert errors and is kept permanently.
-- **DNS rebinding is not mitigated in the URL importer.** The guard is real — https on port 443 only, every DNS answer checked rather than the first, IPv6 expanded so embedded IPv4 forms are judged by the IPv4 rules, redirects followed by hand with each hop revalidated, failure closed. The hole is timing: `assertSafe()` resolves the hostname at [`lib/safe-fetch.ts:161`](lib/safe-fetch.ts#L161) and `fetch` resolves it again independently at `:192`, with nothing binding the two. Fixing it needs a custom `lookup` or a pinned-address dispatcher.
-- **A comment claims protection that is not there.** [`app/onboarding/layout.tsx:12`](app/onboarding/layout.tsx#L12) states that `/onboarding` sits behind the auth proxy. It does not — `proxy.ts:14` lists the protected prefixes and `/onboarding` is not among them. Confirmed by request: signed out, `/app` returns 307 to `/login` and `/onboarding` returns 200. The impact is cosmetic, since every write from that screen then fails, but the stated invariant is not enforced.
 
 **Limits, and things not measured**
 
-- **No end-to-end or component tests.** The 167 tests are pure logic. Every React component, every server action, the service worker, and the rate limiter are uncovered; those paths were checked by hand.
+- **No end-to-end or component tests.** The 172 tests are pure logic. Every React component, every server action, the service worker, and the rate limiter are uncovered; those paths were checked by hand.
 - **No RLS test in CI.** The isolation table above was produced by hand against a local stack. It verifies one commit rather than every commit.
 - **Nothing about performance is measured.** There is no benchmark, no captured Lighthouse run, and no latency figure anywhere in the repository — so this file contains none. Structurally: each screen's reads are one parallel fan-out, and the trip switcher tallies counts from two grouped queries rather than one per trip. Index coverage is untested.
+- **DNS rebinding is closed, but only in this one path.** `safeFetchPage()` validates every address a hostname resolves to and then pins the connection to those addresses with a custom `lookup` ([`lib/safe-fetch.ts:196`](lib/safe-fetch.ts#L196)), so there is no second resolution for a hostile resolver to poison. That required dropping `fetch` for `node:https`. Nothing else in the app takes a user-supplied URL, but anything that later does must go through this module rather than `fetch`.
+- **The sign-out purge is verified by its logic, not in a browser.** `wipeLocalData()` clears the outbox, the BYOK key, and every cache whose name ends in `-pages`, `-data` or `-weather`, keeping `-static`. The name matching is checked against the names `public/sw.js` actually generates, and both call sites type-check — but the end-to-end behaviour in a real browser has not been exercised.
 - **The rate limiter is per-process and partial.** A token bucket in process memory bounds a runaway client loop, not a distributed caller; on serverless each instance keeps its own counters. It guards four of eleven API routes. The replacement goes behind the same `check()` signature.
 - **16 ESLint warnings, 0 errors:** 12 `react-hooks/set-state-in-effect`, 3 `@typescript-eslint/no-unused-vars`, 1 React Compiler bailout. Left visible rather than silenced.
 - **Voice was never built.** It was planned. There is no `/api/voice`, no flag, and no speech dependency — removed from scope rather than left half-finished.

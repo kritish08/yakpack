@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, Loader2, Trash2 } from 'lucide-react'
 import { exportMyData, deleteMyAccount } from '@/app/actions/account'
+import { wipeLocalData } from '@/lib/local-wipe'
 
 /**
  * Leaving.
@@ -47,6 +48,9 @@ export default function DangerZone({ email }: { email: string }) {
     startTransition(async () => {
       try {
         await deleteMyAccount()
+        // The account is gone server-side; the device still holds its cached
+        // rows, pages, outbox and API key until this runs.
+        await wipeLocalData()
         router.push('/')
         router.refresh()
       } catch (e) {

@@ -62,11 +62,23 @@ export async function getPartnersState(): Promise<PartnersState> {
   }
 }
 
-/** Creates an invite and returns its token; the caller shares the link. */
+/**
+ * Creates an invite and returns its token; the caller shares the link.
+ *
+ * The trip comes from the session, never from an argument. It used to come from
+ * neither: the function picked the caller's first organiser membership, which
+ * was the active trip only by coincidence once an account could organise more
+ * than one — so the panel could show one trip's free slots while the link went
+ * into another, and revokeInvite (trip-scoped) could not cancel it.
+ */
 export async function createInvite(email?: string): Promise<{ token: string }> {
+  const ctx = await getTripContext()
+  if (!ctx.isOrganiser) throw new Error('Only the trip organiser can invite partners.')
+
   const supabase = await createClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any).rpc('create_trip_invite', {
+    p_trip_id: ctx.tripId,
     p_email: email?.trim() || null,
   })
   if (error) throw new Error(error.message)
